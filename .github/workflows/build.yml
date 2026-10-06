@@ -48,8 +48,13 @@ jobs:
       - name: Install root deps
         run: npm install
 
-      - name: Add Android platform
-        run: npx cap add android
+      - name: Add Android platform (if missing)
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          else
+            echo "android/ already exists, skipping"
+          fi
 
       - name: Sync Capacitor
         run: npx cap sync android
