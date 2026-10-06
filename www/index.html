@@ -397,4 +397,9 @@
 <script src="js/app.js"></script>
 
 </body>
+  <script>
+window.onerror = function(msg, url, line, col, err) {
+  document.body.innerHTML = '<pre style="padding:20px;color:red;font-size:13px;background:#fff;direction:ltr;white-space:pre-wrap">🔴 ERROR:\n\n' + msg + '\n\n📍 File: ' + (url||'') + '\n📍 Line: ' + line + ':' + col + '\n\n📚 Stack:\n' + (err && err.stack ? err.stack : 'none') + '</pre>';
+};
+  </script>
   </html>
