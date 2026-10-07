@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — الإعدادات
+   Boutik v4 — الإعدادات (مصحّح)
    ============================================================ */
 
 function renderSettings() {
@@ -19,13 +19,16 @@ function renderSettings() {
   const net = document.getElementById('netSettings');
   if (net) {
     const m = DB.mode();
-    net.innerHTML = `
-      <div class="cart-item"><span>الوضع:</span><strong>${m.current === 'host' ? '🖥️ مضيف' : (m.current === 'client' ? '📱 عميل' : '—')}</strong></div>
-      ${m.host ? '<div class="cart-item"><span>الخادم:</span><strong>' + m.host.ip + ':' + m.host.port + '</strong></div>' : ''}
-      <div class="cart-item"><span>معرّف الجهاز:</span><strong dir="ltr" style="font-size:11px">${Device.getId()}</strong></div>
-      <button class="btn btn-primary btn-block" onclick="scanForHosts()">🔄 البحث عن أجهزة رئيسية</button>
-      <button class="btn btn-info btn-block" onclick="Sync.flush()">📤 مزامنة الآن</button>
-    `;
+    const devId = (typeof Device !== 'undefined' && Device.getId) ? Device.getId() : '—';
+    let html = '';
+    html += `<div class="cart-item"><span>الوضع:</span><strong>${m.current === 'host' ? '🖥️ مضيف' : (m.current === 'client' ? '📱 عميل' : '—')}</strong></div>`;
+    if (m.host) {
+      html += `<div class="cart-item"><span>الخادم:</span><strong dir="ltr">${m.host.ip}:${m.host.port}</strong></div>`;
+    }
+    html += `<div class="cart-item"><span>معرّف الجهاز:</span><strong dir="ltr" style="font-size:11px">${devId}</strong></div>`;
+    html += `<button class="btn btn-primary btn-block" onclick="scanForHosts()">🔄 البحث عن أجهزة رئيسية</button>`;
+    html += `<button class="btn btn-info btn-block" onclick="Sync.flush()">📤 مزامنة الآن</button>`;
+    net.innerHTML = html;
   }
 }
 
@@ -36,7 +39,7 @@ function saveShopSettings() {
   s.shopPhone = document.getElementById('setShopPhone').value.trim();
   s.shopRC = document.getElementById('setShopRC').value.trim();
   DB.setObj('settings', s);
-  loadShopName();
+  if (typeof loadShopName === 'function') loadShopName();
   toast('✅ تم الحفظ');
 }
 
