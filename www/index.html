@@ -101,6 +101,7 @@
   <main>
     <!-- ===== DASHBOARD ===== -->
     <div id="tab-dashboard" class="tab-content">
+      <div id="storageWarning" style="display:none"></div>
       <div class="stats">
         <div class="stat"><div class="label">مبيعات اليوم</div><div class="value" id="statTodaySales">0</div></div>
         <div class="stat"><div class="label">فواتير اليوم</div><div class="value" id="statTodayInvoices">0</div></div>
@@ -127,6 +128,14 @@
             <button class="btn btn-primary" onclick="openScanner('pos')">📷</button>
           </div>
           <div id="posResults"></div>
+          <div id="remoteScannerBar" style="margin:8px 0;display:none">
+            <button class="btn btn-info btn-block" onclick="startRemoteScanner()">
+              📡 إرسال المسح إلى الحاسوب (وضع المسح عن بُعد)
+            </button>
+            <div class="small" style="text-align:center;margin-top:4px;color:#666">
+              امسح بالهاتف → يظهر مباشرة على POS الحاسوب
+            </div>
+          </div>
         </div>
         <div class="card">
           <h3>🛒 السلة <span id="cartCount" class="cart-count">0</span></h3>
@@ -337,6 +346,26 @@
         </select>
         <button class="btn btn-primary" onclick="savePrintSettings()">💾</button>
       </div>
+      <div class="card">
+        <h3>🔊 إعدادات الماسح</h3>
+        <label style="display:flex;align-items:center;gap:8px;margin:8px 0">
+          <input type="checkbox" id="setScannerBeep" checked style="width:auto">
+          <span>صوت عند المسح</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;margin:8px 0">
+          <input type="checkbox" id="setScannerVibrate" checked style="width:auto">
+          <span>اهتزاز عند المسح</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;margin:8px 0">
+          <input type="checkbox" id="setScannerAvoidDup" checked style="width:auto">
+          <span>منع المسح المتكرر (2.5 ثانية)</span>
+        </label>
+        <button class="btn btn-primary" onclick="saveScannerSettings()">💾 حفظ</button>
+      </div>
+      <div class="card">
+        <h3>🗑️ إدارة البيانات</h3>
+        <div id="dataManagement"></div>
+      </div>
       <div class="card"><h3>📡 الشبكة</h3><div id="netSettings"></div></div>
       <div class="card">
         <h3>👤 المستخدمون</h3>
@@ -433,4 +462,4 @@
 <script src="js/app.js"></script>
 
 </body>
-  </html>
+</html>
