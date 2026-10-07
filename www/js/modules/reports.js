@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — التقارير
+   Boutik v4 — التقارير (+ تقرير المنتهية)
    ============================================================ */
 
 function renderReports() {
@@ -48,8 +48,7 @@ function renderPeriodReport() {
   const to = document.getElementById('repDateTo').value;
   if (!from || !to) return toast('حدّد الفترة', true);
   const invoices = DB.invoices().filter(i =>
-    i.type === 'sale' &&
-    i.created_at >= from && i.created_at <= to + 'T23:59:59');
+    i.type === 'sale' && i.created_at >= from && i.created_at <= to + 'T23:59:59');
   const total = invoices.reduce((s, i) => s + i.total, 0);
   const el = document.getElementById('periodReport');
   if (!el) return;
@@ -98,4 +97,76 @@ function printTopProducts() {
       <tbody>${list.map((p, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(p.name)}</td><td>${p.qty}</td><td>${fmtNum(p.total)}</td></tr>`).join('')}</tbody>
     </table>
   `, 'الأكثر مبيعًا');
+}
+
+/* ============ تقرير المنتهية ============ */
+function printExpiredProducts() {
+  const expired = DB.products().filter(p => typeof isExpired === 'function' && isExpired(p));
+  const expiring = DB.products().filter(p => typeof isExpiringSoon === 'function' && isExpiringSoon(p));
+  const s = DB.settings();
+
+  printHTML(`
+    <div class="center"><h2>${escapeHtml(s.shopName || 'Boutik')}</h2><div class="small">تقرير المنتجات المنتهية</div></div>
+    <div class="small">التاريخ: ${fmtDate(now())}</div>
+
+    <div class="dashed">
+      <div class="total-row"><span>منتهية الصلاحية:</span><span>${expired.length}</span></div>
+      <div class="total-row"><span>قريبة الانتهاء:</span><span>${expiring.length}</span></div>
+    </div>
+
+    <h3>🚨 منتهية الصلاحية</h3>
+    <table>
+      <thead><tr><th>#</th><th>المنتج</th><th>الكمية</th><th>تاريخ الانتهاء</th><th>سعر البيع</th></tr></thead>
+      <tbody>
+        ${expired.length ? expired.map((p, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${escapeHtml(p.name)}</td>
+            <td>${p.qty}</td>
+            <td>${fmtDateShort(p.expiry_date)}</td>
+            <td>${fmtNum(p.price)}</td>
+          </tr>`).join('') : '<tr><td colspan="5" class="center">لا يوجد</td></tr>'}
+      </tbody>
+    </table>
+
+    <h3>📅 قريبة الانتهاء</h3>
+    <table>
+      <thead><tr><th>#</th><th>المنتج</th><th>الكمية</th><th>تاريخ الانتهاء</th><th>الأيام المتبقية</th></tr></thead>
+      <tbody>
+        ${expiring.length ? expiring.map((p, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${escapeHtml(p.name)}</td>
+            <td>${p.qty}</td>
+            <td>${fmtDateShort(p.expiry_date)}</td>
+            <td>${daysUntilExpiry(p.expiry_date)}</td>
+          </tr>`).join('') : '<tr><td colspan="5" class="center">لا يوجد</td></tr>'}
+      </tbody>
+    </table>
+  `, 'تقرير المنتهية');
+}
+
+/* ============ تقرير حركات المخزون ============ */
+function printStockMovements() {
+  const movements = DB.stockMovements().slice().reverse().slice(0, 500);
+  printHTML(`
+    <div class="center"><h2>حركات المخزون</h2></div>
+    <div class="small">آخر ${movements.length} حركة</div>
+    <table>
+      <thead><tr><th>#</th><th>التاريخ</th><th>المنتج</th><th>النوع</th><th>الكمية</th><th>قبل</th><th>بعد</th><th>السبب</th></tr></thead>
+      <tbody>
+        ${movements.length ? movements.map((m, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${fmtDateShort(m.created_at)}</td>
+            <td>${escapeHtml(m.product_name || '')}</td>
+            <td>${m.type === 'in' ? '🟢+' : (m.type === 'out' ? '🔴-' : '🟡=')}</td>
+            <td>${m.qty}</td>
+            <td>${m.before}</td>
+            <td>${m.after}</td>
+            <td>${escapeHtml(m.reason || '')}</td>
+          </tr>`).join('') : '<tr><td colspan="8" class="center">لا حركات</td></tr>'}
+      </tbody>
+    </table>
+  `, 'حركات المخزون');
 }
