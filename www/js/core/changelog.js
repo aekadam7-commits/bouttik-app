@@ -24,11 +24,13 @@ const ChangeLog = {
       if (log.length > this.MAX) log.splice(0, log.length - this.MAX);
       localStorage.setItem(DB.PREFIX + 'changelog', JSON.stringify(log));
 
-      if (typeof Sync !== 'undefined' && Sync.pushImmediate) {
-        if (Sync.pushImmediate(entry)) {
-          entry.synced = true;
-          this.markSynced([entry.id]);
-        }
+      if (typeof Sync !== 'undefined' && Sync && Sync.pushImmediate) {
+        try {
+          if (Sync.pushImmediate(entry)) {
+            entry.synced = true;
+            this.markSynced([entry.id]);
+          }
+        } catch (e) {}
       }
     } catch (e) {
       console.error('ChangeLog.record error:', e);
