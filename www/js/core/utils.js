@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — أدوات مساعدة (طباعة متوافقة مع APK)
+   Boutik v4 — أدوات مساعدة (طباعة متوافقة مع APK + صوت)
    ============================================================ */
 
 function now() { return new Date().toISOString(); }
@@ -73,9 +73,46 @@ function exportCSV(filename, headers, rows) {
 }
 
 /* ============================================================
-   الطباعة — تعمل في المتصفح + APK + Electron
+   صوت المسح — Beep قوي + اهتزاز
    ============================================================ */
+function playBeep(frequency = 900, duration = 180) {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    if (!window.__beepCtx) window.__beepCtx = new AudioContext();
+    const ctx = window.__beepCtx;
+    if (ctx.state === 'suspended') ctx.resume();
 
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = frequency;
+    gain.gain.value = 0.5;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration / 1000);
+  } catch (e) { console.warn('beep error:', e); }
+}
+
+function playSuccessBeep() {
+  playBeep(900, 150);
+  setTimeout(() => playBeep(1300, 150), 160);
+}
+
+function playErrorBeep() {
+  playBeep(250, 400);
+}
+
+function vibrate(pattern) {
+  try {
+    if (navigator.vibrate) navigator.vibrate(pattern || [80, 40, 80]);
+  } catch (e) {}
+}
+
+/* ============================================================
+   الطباعة
+   ============================================================ */
 function printHTML(content, title) {
   let size = '58';
   try { size = DB.settings().paperSize || '58'; } catch {}
@@ -85,7 +122,6 @@ function printHTML(content, title) {
   else if (size === '80') { width = '72mm'; pageSize = '80mm auto'; }
   else { width = '52mm'; pageSize = '58mm auto'; }
 
-  // إزالة الطبقات السابقة
   const old = document.getElementById('__print_layer__');
   if (old) old.remove();
   const oldStyle = document.getElementById('__print_style__');
@@ -93,60 +129,43 @@ function printHTML(content, title) {
   const oldBtn = document.getElementById('__print_btn__');
   if (oldBtn) oldBtn.remove();
 
-  // الطبقة
   const layer = document.createElement('div');
   layer.id = '__print_layer__';
   layer.className = 'print-layer';
   layer.innerHTML = `<div class="print-page" style="width:${width}">${content}</div>`;
 
-  // الأنماط
   const style = document.createElement('style');
   style.id = '__print_style__';
   style.textContent = `
-    .print-layer {
-      position: fixed; inset: 0; z-index: 99999;
-      background: #fff; color: #000; overflow: auto;
-      padding: 12px; direction: rtl;
-      font-family: Tahoma, Arial, sans-serif;
-    }
-    .print-page { max-width: 100%; margin: 0 auto; font-size: 13px; }
-    .print-page h1, .print-page h2, .print-page h3 { text-align: center; margin: 4px 0; }
-    .print-page table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 12px; }
-    .print-page th, .print-page td { border-bottom: 1px dashed #999; padding: 3px 2px; text-align: right; }
-    .print-page th { border-bottom: 1px solid #333; background: #f0f0f0; }
-    .print-page .dashed { border-top: 1px dashed #666; padding: 4px 0; margin: 4px 0; }
-    .print-page .row { display: flex; justify-content: space-between; padding: 2px 0; }
-    .print-page .total-row { display: flex; justify-content: space-between; font-weight: 700; padding: 2px 0; }
-    .print-page .center { text-align: center; }
-    .print-page .small { font-size: 11px; color: #333; }
-    .print-page .code { font-family: monospace; direction: ltr; text-align: center; padding: 6px; border: 1px dashed #333; margin: 6px 0; }
-    .print-page .label-box { display: inline-block; border: 1px solid #000; padding: 6px; margin: 3px; width: 46mm; text-align: center; vertical-align: top; font-size: 11px; }
-    #__print_btn__ {
-      position: fixed; top: 10px; left: 10px;
-      background: #e74c3c; color: #fff; border: 0;
-      padding: 10px 16px; border-radius: 8px;
-      font-weight: 700; font-size: 14px;
-      z-index: 100001; cursor: pointer;
-    }
+    .print-layer { position:fixed; inset:0; z-index:99999; background:#fff; color:#000; overflow:auto; padding:12px; direction:rtl; font-family:Tahoma,Arial,sans-serif; }
+    .print-page { max-width:100%; margin:0 auto; font-size:13px; }
+    .print-page h1,.print-page h2,.print-page h3 { text-align:center; margin:4px 0; }
+    .print-page table { width:100%; border-collapse:collapse; margin:6px 0; font-size:12px; }
+    .print-page th,.print-page td { border-bottom:1px dashed #999; padding:3px 2px; text-align:right; }
+    .print-page th { border-bottom:1px solid #333; background:#f0f0f0; }
+    .print-page .dashed { border-top:1px dashed #666; padding:4px 0; margin:4px 0; }
+    .print-page .row { display:flex; justify-content:space-between; padding:2px 0; }
+    .print-page .total-row { display:flex; justify-content:space-between; font-weight:700; padding:2px 0; }
+    .print-page .center { text-align:center; }
+    .print-page .small { font-size:11px; color:#333; }
+    .print-page .code { font-family:monospace; direction:ltr; text-align:center; padding:6px; border:1px dashed #333; margin:6px 0; }
+    .print-page .label-box { display:inline-block; border:1px solid #000; padding:6px; margin:3px; width:46mm; text-align:center; vertical-align:top; font-size:11px; }
+    #__print_btn__ { position:fixed; top:10px; left:10px; background:#e74c3c; color:#fff; border:0; padding:10px 16px; border-radius:8px; font-weight:700; font-size:14px; z-index:100001; cursor:pointer; }
     @media print {
       @page { size: ${pageSize}; margin: 3mm; }
-      body > *:not(.print-layer) { display: none !important; }
-      .print-layer { position: static !important; padding: 0 !important; background: #fff !important; }
-      #__print_btn__ { display: none !important; }
+      body > *:not(.print-layer) { display:none !important; }
+      .print-layer { position:static !important; padding:0 !important; background:#fff !important; }
+      #__print_btn__ { display:none !important; }
     }
   `;
 
-  // زر إغلاق
   const closeBtn = document.createElement('button');
   closeBtn.id = '__print_btn__';
   closeBtn.innerHTML = '✖ إغلاق';
   closeBtn.onclick = () => {
-    const l = document.getElementById('__print_layer__');
-    if (l) l.remove();
-    const s = document.getElementById('__print_style__');
-    if (s) s.remove();
-    const b = document.getElementById('__print_btn__');
-    if (b) b.remove();
+    const l = document.getElementById('__print_layer__'); if (l) l.remove();
+    const s = document.getElementById('__print_style__'); if (s) s.remove();
+    const b = document.getElementById('__print_btn__'); if (b) b.remove();
   };
 
   document.body.appendChild(style);
@@ -155,10 +174,7 @@ function printHTML(content, title) {
 
   setTimeout(() => {
     try { window.print(); }
-    catch (e) {
-      console.error('Print error:', e);
-      alert('تعذّر بدء الطباعة.');
-    }
+    catch (e) { console.error('Print error:', e); alert('تعذّر بدء الطباعة.'); }
   }, 300);
 }
 
@@ -203,4 +219,4 @@ function uuid() {
 
 function getQueryParam(name) {
   return new URLSearchParams(location.search).get(name);
-     }
+  }
