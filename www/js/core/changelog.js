@@ -1,22 +1,33 @@
 /* ============================================================
-   Boutik v4 — سجل التغييرات (للمزامنة)
+   Boutik v4 — سجل التغييرات (مصحّح)
    ============================================================ */
 
 const ChangeLog = {
   MAX: 5000,
+  _recording: false,
 
   record(table, data) {
-    const log = DB.get('changelog');
-    log.push({
-      id: uuid(),
-      table,
-      data,
-      ts: Date.now(),
-      deviceId: (typeof Device !== 'undefined') ? Device.getId() : 'unknown',
-      synced: false
-    });
-    if (log.length > this.MAX) log.splice(0, log.length - this.MAX);
-    DB.set('changelog', log);
+    if (this._recording) return;
+    // تجاهل الجداول الداخلية
+    if (!table || ['changelog','auditLog','settings','counters','mode','i18n'].indexOf(table) !== -1) return;
+
+    this._recording = true;
+    try {
+      const log = JSON.parse(localStorage.getItem(DB.PREFIX + 'changelog') || '[]');
+      log.push({
+        id: (typeof __safeUuid === 'function') ? __safeUuid() : String(Date.now()) + Math.random(),
+        table, data,
+        ts: Date.now(),
+        deviceId: (typeof Device !== 'undefined' && Device.getId) ? Device.getId() : 'unknown',
+        synced: false
+      });
+      if (log.length > this.MAX) log.splice(0, log.length - this.MAX);
+      localStorage.setItem(DB.PREFIX + 'changelog', JSON.stringify(log));
+    } catch (e) {
+      console.error('ChangeLog.record error:', e);
+    } finally {
+      this._recording = false;
+    }
   },
 
   pending() {
@@ -24,41 +35,45 @@ const ChangeLog = {
   },
 
   markSynced(ids) {
-    const log = DB.get('changelog');
-    const set = new Set(ids);
-    log.forEach(e => { if (set.has(e.id)) e.synced = true; });
-    DB.set('changelog', log);
+    try {
+      const log = DB.get('changelog');
+      const set = new Set(ids);
+      log.forEach(e => { if (set.has(e.id)) e.synced = true; });
+      localStorage.setItem(DB.PREFIX + 'changelog', JSON.stringify(log));
+    } catch (e) { console.error('markSynced error:', e); }
   },
 
-  // تطبيق تغيير قادم من الشبكة (بدون إعادة تسجيله)
   applyRemote(entry) {
-    if (!entry || !entry.table) return;
-    const cur = DB.get(entry.table);
-    const idx = cur.findIndex(x => x && x.id === entry.data.id);
-    if (idx >= 0) {
-      // LWW: آخر تعديل يفوز
-      if ((entry.data._updated_at || 0) >= (cur[idx]._updated_at || 0)) {
-        cur[idx] = entry.data;
+    if (!entry || !entry.table || !entry.data) return;
+    try {
+      const cur = DB.get(entry.table);
+      const idx = cur.findIndex(x => x && x.id === entry.data.id);
+      const remoteTs = entry.data._updated_at || entry.ts || 0;
+      if (idx >= 0) {
+        if (remoteTs >= (cur[idx]._updated_at || 0)) cur[idx] = entry.data;
+      } else {
+        cur.push(entry.data);
       }
-    } else {
-      cur.push(entry.data);
-    }
-    localStorage.setItem(DB.PREFIX + entry.table, JSON.stringify(cur));
+      localStorage.setItem(DB.PREFIX + entry.table, JSON.stringify(cur));
+    } catch (e) { console.error('applyRemote error:', e); }
   }
 };
 
-/* دالة مساعدة: تحديث سجل مع ختم زمني */
 function upsertRow(table, row) {
-  row._updated_at = Date.now();
-  const cur = DB.get(table);
-  const idx = cur.findIndex(x => x && x.id === row.id);
-  if (idx >= 0) cur[idx] = row;
-  else cur.push(row);
-  DB.set(table, cur);
-  return row;
+  try {
+    row._updated_at = Date.now();
+    const cur = DB.get(table);
+    const idx = cur.findIndex(x => x && x.id === row.id);
+    if (idx >= 0) cur[idx] = row;
+    else cur.push(row);
+    DB.set(table, cur);
+    return row;
+  } catch (e) { console.error('upsertRow error:', e); }
 }
 
 function removeRow(table, id) {
-  const cur = DB.get(table).filter(x => x && x.id !== id);
-  DB.set(table, cur);
+  try {
+    const cur = DB.get(table).filter(x => x && x.id !== id);
+    DB.set(table, cur);
+  } catch (e) { console.error('removeRow error:', e); }
 }
