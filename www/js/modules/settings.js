@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — الإعدادات (طباعة + حجم الورق)
+   Boutik v4 — الإعدادات (مع إدارة البيانات + إعدادات الماسح)
    ============================================================ */
 
 function renderSettings() {
@@ -16,6 +16,10 @@ function renderSettings() {
   if (el('setExpiryDays')) el('setExpiryDays').value = s.expiryDays || 30;
   if (el('setPaperSize')) el('setPaperSize').value = s.paperSize || '58';
 
+  if (el('setScannerBeep')) el('setScannerBeep').checked = s.scannerBeep !== false;
+  if (el('setScannerVibrate')) el('setScannerVibrate').checked = s.scannerVibrate !== false;
+  if (el('setScannerAvoidDup')) el('setScannerAvoidDup').checked = s.scannerAvoidDuplicate !== false;
+
   const net = document.getElementById('netSettings');
   if (net) {
     const m = DB.mode();
@@ -28,6 +32,8 @@ function renderSettings() {
       <button class="btn btn-info btn-block" onclick="Sync.flush()">📤 مزامنة الآن</button>
     `;
   }
+
+  if (typeof renderDataManagement === 'function') renderDataManagement();
 }
 
 function saveShopSettings() {
@@ -85,6 +91,7 @@ function showSyncStatus() {
     <div class="cart-item"><span>إجمالي السجلات:</span><strong>${log.length}</strong></div>
     <div class="cart-item"><span>في الانتظار:</span><strong>${pending}</strong></div>
     <div class="cart-item"><span>الوضع:</span><strong>${DB.mode().current || '—'}</strong></div>
+    <div class="cart-item"><span>WebSocket:</span><strong>${Sync.ws && Sync.ws.readyState === 1 ? '🟢 متصل' : '🔴 غير متصل'}</strong></div>
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="Sync.flush().then(()=>toast('تم الإرسال'))">📤 إرسال الآن</button>
       <button class="btn btn-info" onclick="Sync.pull()">📥 استلام</button>
