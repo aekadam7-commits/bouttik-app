@@ -1,12 +1,13 @@
 /* ============================================================
-   Boutik v4 — أدوات مساعدة
+   Boutik v4 — أدوات مساعدة (مصحّح)
    ============================================================ */
 
 function now() { return new Date().toISOString(); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 function currency() {
-  return (DB.settings().currency) || 'دج';
+  try { return (DB.settings().currency) || 'دج'; }
+  catch { return 'دج'; }
 }
 
 function fmt(n) {
@@ -91,20 +92,20 @@ function printHTML(content, title) {
       .label-box{display:inline-block;border:1px solid #000;padding:8px;margin:5px;width:180px;text-align:center}
       @media print{@page{margin:8mm}body{padding:0}}
     </style></head><body>${content}
-    <script>setTimeout(()=>{window.print();window.onafterprint=()=>window.close();},300)<\/script>
     </body></html>`);
   w.document.close();
+  setTimeout(() => { try { w.print(); } catch (e) {} }, 400);
 }
 
 function isExpiringSoon(p) {
-  if (!p.expiry_date) return false;
+  if (!p || !p.expiry_date) return false;
   const days = daysUntilExpiry(p.expiry_date);
-  const limit = DB.settings().expiryDays || 30;
+  const limit = (DB.settings().expiryDays) || 30;
   return days >= 0 && days <= limit;
 }
 
 function isExpired(p) {
-  if (!p.expiry_date) return false;
+  if (!p || !p.expiry_date) return false;
   return daysUntilExpiry(p.expiry_date) < 0;
 }
 
@@ -126,7 +127,9 @@ function debounce(fn, ms) {
 }
 
 function uuid() {
-  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  } catch (e) {}
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0;
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
