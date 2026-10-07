@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — الفواتير
+   Boutik v4 — الفواتير (طباعة متوافقة مع APK)
    ============================================================ */
 
 function renderInvoices() {
@@ -16,8 +16,8 @@ function renderInvoices() {
       <td>${fmt(i.total)}</td>
       <td>${statusBadge(i)}</td>
       <td>
-        <button class="btn btn-info btn-sm" onclick="printInvoice('${i.id}')">🖨️</button>
-        ${i.due > 0 ? `<button class="btn btn-warning btn-sm" onclick="openPayModal('${i.id}')">💰</button>` : ''}
+        <button class="btn btn-info btn-sm" onclick="printInvoice('${i.id}')" title="طباعة">🖨️</button>
+        ${i.due > 0 ? `<button class="btn btn-warning btn-sm" onclick="openPayModal('${i.id}')" title="دفعة">💰</button>` : ''}
       </td>
     </tr>`).join('') : '<tr><td colspan="6" class="empty">لا فواتير</td></tr>';
 }
@@ -53,18 +53,15 @@ function confirmPay(invoiceId) {
   inv.status = inv.due === 0 ? 'paid' : (inv.paid > 0 ? 'partial' : 'credit');
   upsertRow('invoices', inv);
 
-  // حركة دفع
-  const pay = {
+  upsertRow('payments', {
     id: uuid(),
     invoice_id: invoiceId,
     customer_id: inv.customer_id,
     amount: actual,
     user: currentUser.username,
     created_at: now()
-  };
-  upsertRow('payments', pay);
+  });
 
-  // خصم من رصيد الزبون
   if (inv.customer_id) {
     const c = DB.customers().find(x => x.id === inv.customer_id);
     if (c) {
@@ -79,6 +76,52 @@ function confirmPay(invoiceId) {
   toast('✅ تم تسجيل الدفعة');
 }
 
+/* ============================================================
+   طباعة الفاتورة — متوافقة مع حجم الورق
+   ============================================================ */
+function printInvoice(invoiceId) {
+  const inv = DB.invoices().find(i => i.id === invoiceId);
+  if (!inv) { toast('الفاتورة غير موجودة', true); return; }
+
+  const items = DB.invoiceItems().filter(i => i.invoice_id === invoiceId);
+  const s = DB.settings();
+
+  const html = `
+    <div class="center">
+      <h2>${escapeHtml(s.shopName || 'Boutik')}</h2>
+      ${s.shopAddress ? `<div class="small">${escapeHtml(s.shopAddress)}</div>` : ''}
+      ${s.shopPhone ? `<div class="small">📞 ${escapeHtml(s.shopPhone)}</div>` : ''}
+      ${s.shopRC ? `<div class="small">RC: ${escapeHtml(s.shopRC)}</div>` : ''}
+    </div>
+    <hr class="sep">
+    <div class="row"><span>الفاتورة:</span><b>${escapeHtml(inv.number)}</b></div>
+    <div class="row"><span>التاريخ:</span><span>${fmtDate(inv.created_at)}</span></div>
+    <div class="row"><span>الزبون:</span><span>${escapeHtml(inv.customer_name || 'زبون عادي')}</span></div>
+    <div class="row"><span>البائع:</span><span>${escapeHtml(inv.user || '')}</span></div>
+    <hr class="sep">
+    <table>
+      <thead><tr><th>المادة</th><th>كمية</th><th>سعر</th><th>مجموع</th></tr></thead>
+      <tbody>
+        ${items.map(it => `
+          <tr>
+            <td>${escapeHtml(it.name)}</td>
+            <td>${it.qty}</td>
+            <td>${fmtNum(it.price)}</td>
+            <td>${fmtNum(it.subtotal || it.price * it.qty)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <hr class="sep">
+    <div class="total-row"><span>المجموع:</span><span>${fmt(inv.total)}</span></div>
+    <div class="total-row"><span>المدفوع:</span><span>${fmt(inv.paid)}</span></div>
+    ${inv.due > 0 ? `<div class="total-row" style="color:#c00"><span>الباقي:</span><span>${fmt(inv.due)}</span></div>` : ''}
+    <hr class="sep">
+    <div class="center small">شكرًا لزيارتكم 🌟</div>
+  `;
+
+  printHTML(html, 'فاتورة ' + inv.number);
+}
+
 function printDailyReport() {
   const today = todayISO();
   const invoices = DB.invoices().filter(i => i.type === 'sale' && i.created_at.startsWith(today));
@@ -87,20 +130,29 @@ function printDailyReport() {
   const due = invoices.reduce((s, i) => s + (i.due || 0), 0);
   const s = DB.settings();
 
-  printHTML(`
+  const html = `
     <div class="center">
       <h2>${escapeHtml(s.shopName || 'Boutik')}</h2>
       <div class="small">تقرير اليوم — ${fmtDateShort(today)}</div>
     </div>
-    <div class="dashed">
-      <div class="total-row"><span>عدد الفواتير:</span><span>${invoices.length}</span></div>
-      <div class="total-row"><span>إجمالي المبيعات:</span><span>${fmt(total)}</span></div>
-      <div class="total-row"><span>المدفوع:</span><span>${fmt(paid)}</span></div>
-      <div class="total-row"><span>الباقي:</span><span>${fmt(due)}</span></div>
-    </div>
+    <hr class="sep">
+    <div class="total-row"><span>عدد الفواتير:</span><span>${invoices.length}</span></div>
+    <div class="total-row"><span>إجمالي المبيعات:</span><span>${fmt(total)}</span></div>
+    <div class="total-row"><span>المدفوع:</span><span>${fmt(paid)}</span></div>
+    <div class="total-row"><span>الباقي:</span><span>${fmt(due)}</span></div>
+    <hr class="sep">
     <table>
-      <thead><tr><th>#</th><th>فاتورة</th><th>زبون</th><th>إجمالي</th><th>الحالة</th></tr></thead>
-      <tbody>${invoices.map((i, idx) => `<tr><td>${idx + 1}</td><td>${i.number}</td><td>${escapeHtml(i.customer_name)}</td><td>${fmtNum(i.total)}</td><td>${i.status === 'paid' ? 'مدفوع' : 'دين'}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>#</th><th>فاتورة</th><th>زبون</th><th>إجمالي</th></tr></thead>
+      <tbody>
+        ${invoices.map((i, idx) => `
+          <tr>
+            <td>${idx + 1}</td>
+            <td>${escapeHtml(i.number)}</td>
+            <td>${escapeHtml(i.customer_name || '—')}</td>
+            <td>${fmtNum(i.total)}</td>
+          </tr>`).join('')}
+      </tbody>
     </table>
-  `, 'تقرير اليوم');
-}
+  `;
+  printHTML(html, 'تقرير اليوم');
+                                  }
