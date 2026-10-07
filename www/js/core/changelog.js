@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — سجل التغييرات (مصحّح)
+   Boutik v4 — سجل التغييرات + إرسال فوري
    ============================================================ */
 
 const ChangeLog = {
@@ -8,21 +8,28 @@ const ChangeLog = {
 
   record(table, data) {
     if (this._recording) return;
-    // تجاهل الجداول الداخلية
     if (!table || ['changelog','auditLog','settings','counters','mode','i18n'].indexOf(table) !== -1) return;
 
     this._recording = true;
     try {
       const log = JSON.parse(localStorage.getItem(DB.PREFIX + 'changelog') || '[]');
-      log.push({
+      const entry = {
         id: (typeof __safeUuid === 'function') ? __safeUuid() : String(Date.now()) + Math.random(),
         table, data,
         ts: Date.now(),
         deviceId: (typeof Device !== 'undefined' && Device.getId) ? Device.getId() : 'unknown',
         synced: false
-      });
+      };
+      log.push(entry);
       if (log.length > this.MAX) log.splice(0, log.length - this.MAX);
       localStorage.setItem(DB.PREFIX + 'changelog', JSON.stringify(log));
+
+      if (typeof Sync !== 'undefined' && Sync.pushImmediate) {
+        if (Sync.pushImmediate(entry)) {
+          entry.synced = true;
+          this.markSynced([entry.id]);
+        }
+      }
     } catch (e) {
       console.error('ChangeLog.record error:', e);
     } finally {
@@ -56,6 +63,18 @@ const ChangeLog = {
       }
       localStorage.setItem(DB.PREFIX + entry.table, JSON.stringify(cur));
     } catch (e) { console.error('applyRemote error:', e); }
+  },
+
+  cleanSynced(keepDays) {
+    keepDays = keepDays || 7;
+    try {
+      const cutoff = Date.now() - keepDays * 86400000;
+      const log = DB.get('changelog');
+      const newLog = log.filter(e => !e.synced || (e.ts || 0) > cutoff);
+      const removed = log.length - newLog.length;
+      localStorage.setItem(DB.PREFIX + 'changelog', JSON.stringify(newLog));
+      return removed;
+    } catch (e) { return 0; }
   }
 };
 
