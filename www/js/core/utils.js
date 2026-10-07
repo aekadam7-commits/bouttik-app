@@ -73,94 +73,93 @@ function exportCSV(filename, headers, rows) {
 }
 
 /* ============================================================
-   الطباعة — متوافقة مع المتصفح + APK + Electron
+   الطباعة — تعمل في المتصفح + APK + Electron
    ============================================================ */
-function paperCSS() {
-  let size = '58mm';
-  try { size = DB.settings().paperSize || '58'; } catch {}
-  if (size === 'a4') return { width: '190mm', fontSize: '12px', pageSize: 'A4' };
-  if (size === '80') return { width: '72mm', fontSize: '11px', pageSize: '80mm auto' };
-  return { width: '52mm', fontSize: '10px', pageSize: '58mm auto' };
-}
 
 function printHTML(content, title) {
-  const p = paperCSS();
+  let size = '58';
+  try { size = DB.settings().paperSize || '58'; } catch {}
 
-  const html = `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapeHtml(title || 'Boutik')}</title>
-<style>
-  *{box-sizing:border-box}
-  html,body{margin:0;padding:0;background:#fff;color:#000}
-  body{font-family:Tahoma,Arial,sans-serif;direction:rtl}
-  .print-wrap{
-    width:${p.width};
-    max-width:100%;
-    margin:0 auto;
-    padding:5mm 3mm;
-    font-size:${p.fontSize};
-  }
-  .center{text-align:center}
-  h1,h2,h3{text-align:center;margin:3px 0;font-size:1.15em}
-  .small{font-size:.85em;color:#333}
-  table{width:100%;border-collapse:collapse;margin:6px 0;font-size:.9em}
-  th,td{border-bottom:1px dashed #999;padding:3px 2px;text-align:right}
-  th{border-bottom:1px solid #333;background:#f0f0f0}
-  .dashed{border-top:1px dashed #666;padding:4px 0;margin:4px 0}
-  .row{display:flex;justify-content:space-between;padding:1px 0}
-  .total-row{display:flex;justify-content:space-between;font-weight:700;padding:2px 0}
-  .code{font-family:monospace;font-size:.95em;direction:ltr;text-align:center;padding:6px;border:1px dashed #333;margin:6px 0}
-  .label-box{display:inline-block;border:1px solid #000;padding:6px;margin:3px;width:46mm;text-align:center;vertical-align:top;font-size:.8em}
-  .sep{border:none;border-top:1px dashed #666;margin:6px 0}
-  @media print{
-    @page{size:${p.pageSize};margin:2mm}
-    html,body{width:${p.width};margin:0}
-    .no-print{display:none!important}
-  }
-</style>
-</head>
-<body>
-<div class="print-wrap">${content}</div>
-<script>
-  window.addEventListener('load', function () {
-    setTimeout(function () {
-      try { window.focus(); window.print(); } catch (e) {}
-    }, 300);
-  });
-<\/script>
-</body>
-</html>`;
+  let width, pageSize;
+  if (size === 'a4') { width = '190mm'; pageSize = 'A4 portrait'; }
+  else if (size === '80') { width = '72mm'; pageSize = '80mm auto'; }
+  else { width = '52mm'; pageSize = '58mm auto'; }
 
-  // 1. جرّب iframe أولًا (يعمل في APK/Electron/المتصفح)
-  try {
-    const old = document.getElementById('__print_frame__');
-    if (old) old.remove();
-    const iframe = document.createElement('iframe');
-    iframe.id = '__print_frame__';
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
-    document.body.appendChild(iframe);
+  // إزالة الطبقات السابقة
+  const old = document.getElementById('__print_layer__');
+  if (old) old.remove();
+  const oldStyle = document.getElementById('__print_style__');
+  if (oldStyle) oldStyle.remove();
+  const oldBtn = document.getElementById('__print_btn__');
+  if (oldBtn) oldBtn.remove();
 
-    const d = iframe.contentWindow.document;
-    d.open();
-    d.write(html);
-    d.close();
+  // الطبقة
+  const layer = document.createElement('div');
+  layer.id = '__print_layer__';
+  layer.className = 'print-layer';
+  layer.innerHTML = `<div class="print-page" style="width:${width}">${content}</div>`;
 
-    // إزالة الـ iframe بعد 30 ثانية
-    setTimeout(() => { try { iframe.remove(); } catch (e) {} }, 30000);
-    return;
-  } catch (e) {
-    console.warn('iframe print failed, fallback to window.open', e);
-  }
+  // الأنماط
+  const style = document.createElement('style');
+  style.id = '__print_style__';
+  style.textContent = `
+    .print-layer {
+      position: fixed; inset: 0; z-index: 99999;
+      background: #fff; color: #000; overflow: auto;
+      padding: 12px; direction: rtl;
+      font-family: Tahoma, Arial, sans-serif;
+    }
+    .print-page { max-width: 100%; margin: 0 auto; font-size: 13px; }
+    .print-page h1, .print-page h2, .print-page h3 { text-align: center; margin: 4px 0; }
+    .print-page table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 12px; }
+    .print-page th, .print-page td { border-bottom: 1px dashed #999; padding: 3px 2px; text-align: right; }
+    .print-page th { border-bottom: 1px solid #333; background: #f0f0f0; }
+    .print-page .dashed { border-top: 1px dashed #666; padding: 4px 0; margin: 4px 0; }
+    .print-page .row { display: flex; justify-content: space-between; padding: 2px 0; }
+    .print-page .total-row { display: flex; justify-content: space-between; font-weight: 700; padding: 2px 0; }
+    .print-page .center { text-align: center; }
+    .print-page .small { font-size: 11px; color: #333; }
+    .print-page .code { font-family: monospace; direction: ltr; text-align: center; padding: 6px; border: 1px dashed #333; margin: 6px 0; }
+    .print-page .label-box { display: inline-block; border: 1px solid #000; padding: 6px; margin: 3px; width: 46mm; text-align: center; vertical-align: top; font-size: 11px; }
+    #__print_btn__ {
+      position: fixed; top: 10px; left: 10px;
+      background: #e74c3c; color: #fff; border: 0;
+      padding: 10px 16px; border-radius: 8px;
+      font-weight: 700; font-size: 14px;
+      z-index: 100001; cursor: pointer;
+    }
+    @media print {
+      @page { size: ${pageSize}; margin: 3mm; }
+      body > *:not(.print-layer) { display: none !important; }
+      .print-layer { position: static !important; padding: 0 !important; background: #fff !important; }
+      #__print_btn__ { display: none !important; }
+    }
+  `;
 
-  // 2. fallback: نافذة جديدة
-  const w = window.open('', '_blank', 'width=400,height=600');
-  if (!w) { alert('يرجى السماح بالنوافذ المنبثقة للطباعة'); return; }
-  w.document.write(html);
-  w.document.close();
+  // زر إغلاق
+  const closeBtn = document.createElement('button');
+  closeBtn.id = '__print_btn__';
+  closeBtn.innerHTML = '✖ إغلاق';
+  closeBtn.onclick = () => {
+    const l = document.getElementById('__print_layer__');
+    if (l) l.remove();
+    const s = document.getElementById('__print_style__');
+    if (s) s.remove();
+    const b = document.getElementById('__print_btn__');
+    if (b) b.remove();
+  };
+
+  document.body.appendChild(style);
+  document.body.appendChild(layer);
+  document.body.appendChild(closeBtn);
+
+  setTimeout(() => {
+    try { window.print(); }
+    catch (e) {
+      console.error('Print error:', e);
+      alert('تعذّر بدء الطباعة.');
+    }
+  }, 300);
 }
 
 function isExpiringSoon(p) {
@@ -204,4 +203,4 @@ function uuid() {
 
 function getQueryParam(name) {
   return new URLSearchParams(location.search).get(name);
-}
+     }
