@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — المنتجات
+   Boutik v4 — المنتجات (إضافة كمية + سجل حركات المخزون)
    ============================================================ */
 
 function renderProducts() {
@@ -17,21 +17,26 @@ function renderProducts() {
 
   const tb = document.getElementById('productsTable');
   if (!tb) return;
-  tb.innerHTML = list.length ? list.map(p => `
-    <tr>
+  tb.innerHTML = list.length ? list.map(p => {
+    const isExp = typeof isExpired === 'function' && isExpired(p);
+    const rowStyle = isExp ? 'background:#ffecec;' : '';
+    return `
+    <tr style="${rowStyle}">
       <td dir="ltr">${escapeHtml(p.barcode || '—')}</td>
-      <td>${escapeHtml(p.name)}</td>
+      <td>${escapeHtml(p.name)} ${isExp ? '🚨' : ''}</td>
       <td>${escapeHtml(p.category || '—')}</td>
       <td style="color:${p.qty <= 0 ? '#e74c3c' : (p.qty <= (p.min_qty || 5) ? '#f39c12' : '#138a45')};font-weight:700">${p.qty}</td>
       <td>${fmt(p.price)}</td>
       <td>${p.expiry_date ? fmtDateShort(p.expiry_date) : '—'}</td>
       <td>
-        <button class="btn btn-info btn-sm" onclick="openProductModal('${p.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')">🗑️</button>
+        <button class="btn btn-success btn-sm" onclick="openAddQtyModal('${p.id}')" title="إضافة كمية">➕</button>
+        <button class="btn btn-info btn-sm" onclick="openProductModal('${p.id}')" title="تعديل">✏️</button>
+        <button class="btn btn-warning btn-sm" onclick="openStockHistory('${p.id}')" title="سجل الحركات">📜</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')" title="حذف">🗑️</button>
       </td>
-    </tr>`).join('') : '<tr><td colspan="7" class="empty">لا توجد منتجات</td></tr>';
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">لا توجد منتجات</td></tr>';
 
-  // تعبئة الفئات
   const sel = document.getElementById('prodFilterCategory');
   if (sel) {
     const cur = sel.value;
@@ -41,6 +46,98 @@ function renderProducts() {
   }
 }
 
+/* ============ إضافة كمية سريعة ============ */
+function openAddQtyModal(id) {
+  const p = DB.products().find(x => x.id === id);
+  if (!p) return;
+  openModal(`
+    <h3>➕ إضافة كمية — ${escapeHtml(p.name)}</h3>
+    <div style="background:var(--bg);padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px">
+      <div style="display:flex;justify-content:space-between"><span>الكمية الحالية:</span><b>${p.qty}</b></div>
+    </div>
+    <label class="lbl">الكمية المضافة</label>
+    <input id="addQtyVal" type="number" inputmode="numeric" value="0" min="1">
+    <label class="lbl">سعر الشراء (اختياري)</label>
+    <input id="addQtyCost" type="number" inputmode="decimal" value="${p.cost || 0}">
+    <label class="lbl">ملاحظة (اختياري)</label>
+    <input id="addQtyNote" placeholder="مثال: شراء من المورد">
+    <div class="modal-actions">
+      <button class="btn btn-success" onclick="confirmAddQty('${id}')">💾 حفظ</button>
+      <button class="btn btn-danger" onclick="closeModal()">إلغاء</button>
+    </div>`);
+}
+
+function confirmAddQty(id) {
+  const p = DB.products().find(x => x.id === id);
+  if (!p) return;
+  const qty = +document.getElementById('addQtyVal').value || 0;
+  if (qty <= 0) { toast('أدخل كمية صحيحة', true); return; }
+  const cost = +document.getElementById('addQtyCost').value || p.cost || 0;
+  const note = (document.getElementById('addQtyNote').value || '').trim();
+
+  const before = p.qty || 0;
+  p.qty = before + qty;
+  if (cost) p.cost = cost;
+  upsertRow('products', p);
+
+  if (typeof recordStockMovement === 'function') {
+    recordStockMovement(p.id, p.name, 'in', qty, before, p.qty, note || 'إضافة يدوية');
+  }
+
+  audit('stock_add', `${p.name} +${qty}`);
+  toast(`✅ تمت إضافة ${qty} (المخزون: ${p.qty})`);
+  closeModal();
+  renderProducts();
+}
+
+/* ============ سجل حركات المخزون ============ */
+function recordStockMovement(productId, productName, type, qty, before, after, reason) {
+  try {
+    const movements = DB.get('stockMovements');
+    movements.push({
+      id: uuid(),
+      product_id: productId,
+      product_name: productName,
+      type: type,
+      qty: qty,
+      before: before,
+      after: after,
+      reason: reason || '',
+      user: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.username : 'system',
+      created_at: now()
+    });
+    if (movements.length > 5000) movements.splice(0, movements.length - 5000);
+    localStorage.setItem(DB.PREFIX + 'stockMovements', JSON.stringify(movements));
+  } catch (e) { console.error('recordStockMovement:', e); }
+}
+
+function openStockHistory(id) {
+  const p = DB.products().find(x => x.id === id);
+  if (!p) return;
+  const list = DB.stockMovements().filter(m => m.product_id === id).slice().reverse();
+
+  openModal(`
+    <h3>📜 حركات — ${escapeHtml(p.name)}</h3>
+    <div style="max-height:400px;overflow-y:auto">
+      ${list.length ? list.map(m => {
+        const color = m.type === 'in' ? '#138a45' : (m.type === 'out' ? '#e74c3c' : '#f39c12');
+        const sign = m.type === 'in' ? '+' : (m.type === 'out' ? '-' : '=');
+        const label = m.type === 'in' ? '🟢 إضافة' : (m.type === 'out' ? '🔴 خصم' : '🟡 تعديل');
+        return `
+          <div class="cart-item">
+            <div>
+              <strong style="color:${color}">${label} ${sign}${m.qty}</strong>
+              <div class="small">${m.before} → ${m.after} | ${escapeHtml(m.reason || '')}</div>
+              <div class="small">${fmtDate(m.created_at)} — ${escapeHtml(m.user || '')}</div>
+            </div>
+          </div>`;
+      }).join('') : '<div class="empty">لا توجد حركات</div>'}
+    </div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal()">إغلاق</button></div>
+  `);
+}
+
+/* ============ إضافة/تعديل منتج ============ */
 function openProductModal(id) {
   const p = id ? DB.products().find(x => x.id === id) : { name: '', barcode: '', category: '', qty: 0, min_qty: 5, price: 0, cost: 0, expiry_date: '' };
   const cats = DB.categories();
@@ -54,7 +151,7 @@ function openProductModal(id) {
       ${cats.map(c => `<option value="${escapeHtml(c.name)}" ${c.name === p.category ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
     </select>
     <div class="row">
-      <div><label class="lbl">الكمية</label><input id="pQty" type="number" inputmode="numeric" value="${p.qty}"></div>
+      <div><label class="lbl">الكمية (تصحيح)</label><input id="pQty" type="number" inputmode="numeric" value="${p.qty}"></div>
       <div><label class="lbl">حد التنبيه</label><input id="pMinQty" type="number" inputmode="numeric" value="${p.min_qty || 5}"></div>
     </div>
     <div class="row">
@@ -72,7 +169,10 @@ function saveProduct(id) {
   const barcode = document.getElementById('pBarcode').value.trim();
   const name = document.getElementById('pName').value.trim();
   if (!name) { toast('أدخل الاسم', true); return; }
+  const isNew = !id;
   const p = id ? DB.products().find(x => x.id === id) : { id: uuid(), created_at: now() };
+  const beforeQty = p.qty || 0;
+
   p.barcode = barcode;
   p.name = name;
   p.category = document.getElementById('pCategory').value;
@@ -82,6 +182,13 @@ function saveProduct(id) {
   p.price = +document.getElementById('pPrice').value || 0;
   p.expiry_date = document.getElementById('pExpiry').value || '';
   upsertRow('products', p);
+
+  if (!isNew && beforeQty !== p.qty) {
+    if (typeof recordStockMovement === 'function') {
+      recordStockMovement(p.id, p.name, 'adjust', Math.abs(p.qty - beforeQty), beforeQty, p.qty, 'تصحيح يدوي');
+    }
+  }
+
   audit('product_save', name);
   closeModal();
   renderProducts();
@@ -124,4 +231,4 @@ function printBarcodeLabels() {
         </div>`).join('')}
     </div>
   `, 'ملصقات الباركود');
-                                                               }
+}
