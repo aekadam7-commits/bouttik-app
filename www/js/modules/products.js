@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — المنتجات (إضافة كمية + سجل حركات المخزون)
+   Boutik v4 — المنتجات (بحث تلقائي + إضافة كمية + سجل حركات)
    ============================================================ */
 
 function renderProducts() {
@@ -137,13 +137,59 @@ function openStockHistory(id) {
   `);
 }
 
+/* ============ بحث تلقائي عند مسح/كتابة الباركود ============ */
+function onProductBarcodeChange(barcode) {
+  barcode = (barcode || '').trim();
+  if (!barcode) return;
+  const existing = DB.products().find(p => p.barcode === barcode);
+  const infoEl = document.getElementById('pBarcodeInfo');
+  if (!infoEl) return;
+
+  if (existing) {
+    // منتج موجود
+    infoEl.innerHTML = `<div style="background:#fff3cd;color:#856404;padding:10px;border-radius:8px;margin:8px 0;font-size:13px">
+      ⚠️ يوجد منتج بنفس الباركود: <b>${escapeHtml(existing.name)}</b> (الكمية: ${existing.qty})
+      <div style="margin-top:8px">
+        <button class="btn btn-info btn-sm" onclick="loadExistingProduct('${existing.id}')">✏️ تحميل بياناته</button>
+        <button class="btn btn-success btn-sm" onclick="addQtyToExisting('${existing.id}')">➕ إضافة كمية له</button>
+      </div>
+    </div>`;
+  } else {
+    // منتج جديد
+    infoEl.innerHTML = `<div style="background:#d4edda;color:#155724;padding:10px;border-radius:8px;margin:8px 0;font-size:13px">
+      ✅ باركود جديد — أدخل بيانات المنتج
+    </div>`;
+  }
+}
+
+function loadExistingProduct(id) {
+  const p = DB.products().find(x => x.id === id);
+  if (!p) return;
+  closeModal();
+  openProductModal(id);
+}
+
+function addQtyToExisting(id) {
+  closeModal();
+  openAddQtyModal(id);
+}
+
 /* ============ إضافة/تعديل منتج ============ */
 function openProductModal(id) {
-  const p = id ? DB.products().find(x => x.id === id) : { name: '', barcode: '', category: '', qty: 0, min_qty: 5, price: 0, cost: 0, expiry_date: '' };
+  const p = id ? DB.products().find(x => x.id === id) : {
+    name: '', barcode: '', category: '', qty: 0, min_qty: 5, price: 0, cost: 0, expiry_date: ''
+  };
   const cats = DB.categories();
   openModal(`
     <h3>${id ? '✏️ تعديل' : '➕ منتج جديد'}</h3>
-    <label class="lbl">الباركود</label><input id="pBarcode" dir="ltr" value="${escapeHtml(p.barcode || '')}">
+    <label class="lbl">الباركود</label>
+    <div style="display:flex;gap:6px;align-items:stretch">
+      <input id="pBarcode" dir="ltr" style="flex:1" value="${escapeHtml(p.barcode || '')}"
+             oninput="onProductBarcodeChange(this.value)"
+             onchange="onProductBarcodeChange(this.value)">
+      <button type="button" class="btn btn-primary" onclick="openScanner('product-barcode')" title="مسح">📷</button>
+    </div>
+    <div id="pBarcodeInfo"></div>
     <label class="lbl">الاسم</label><input id="pName" value="${escapeHtml(p.name || '')}">
     <label class="lbl">الفئة</label>
     <select id="pCategory">
@@ -151,7 +197,7 @@ function openProductModal(id) {
       ${cats.map(c => `<option value="${escapeHtml(c.name)}" ${c.name === p.category ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
     </select>
     <div class="row">
-      <div><label class="lbl">الكمية (تصحيح)</label><input id="pQty" type="number" inputmode="numeric" value="${p.qty}"></div>
+      <div><label class="lbl">الكمية</label><input id="pQty" type="number" inputmode="numeric" value="${p.qty}"></div>
       <div><label class="lbl">حد التنبيه</label><input id="pMinQty" type="number" inputmode="numeric" value="${p.min_qty || 5}"></div>
     </div>
     <div class="row">
@@ -163,12 +209,36 @@ function openProductModal(id) {
       <button class="btn btn-success" onclick="saveProduct('${id || ''}')">💾 حفظ</button>
       <button class="btn btn-danger" onclick="closeModal()">إلغاء</button>
     </div>`);
+
+  // إذا كان هناك باركود مُعبّأ مسبقًا → افحص فورًا
+  if (p.barcode) setTimeout(() => onProductBarcodeChange(p.barcode), 100);
+}
+
+/* فتح نموذج منتج جديد مع باركود معبّأ */
+function openProductModalWithBarcode(barcode) {
+  openProductModal();
+  setTimeout(() => {
+    const f = document.getElementById('pBarcode');
+    if (f) {
+      f.value = barcode;
+      onProductBarcodeChange(barcode);
+    }
+  }, 100);
 }
 
 function saveProduct(id) {
-  const barcode = document.getElementById('pBarcode').value.trim();
-  const name = document.getElementById('pName').value.trim();
+  const barcode = (document.getElementById('pBarcode').value || '').trim();
+  const name = (document.getElementById('pName').value || '').trim();
   if (!name) { toast('أدخل الاسم', true); return; }
+
+  // منع التكرار
+  if (barcode) {
+    const duplicate = DB.products().find(p => p.barcode === barcode && p.id !== id);
+    if (duplicate) {
+      if (!confirm(`⚠️ الباركود مستعمل للمنتج: ${duplicate.name}\n\nهل تريد المتابعة؟`)) return;
+    }
+  }
+
   const isNew = !id;
   const p = id ? DB.products().find(x => x.id === id) : { id: uuid(), created_at: now() };
   const beforeQty = p.qty || 0;
