@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — الإعدادات (مصحّح)
+   Boutik v4 — الإعدادات (طباعة + حجم الورق)
    ============================================================ */
 
 function renderSettings() {
@@ -20,24 +20,22 @@ function renderSettings() {
   if (net) {
     const m = DB.mode();
     const devId = (typeof Device !== 'undefined' && Device.getId) ? Device.getId() : '—';
-    let html = '';
-    html += `<div class="cart-item"><span>الوضع:</span><strong>${m.current === 'host' ? '🖥️ مضيف' : (m.current === 'client' ? '📱 عميل' : '—')}</strong></div>`;
-    if (m.host) {
-      html += `<div class="cart-item"><span>الخادم:</span><strong dir="ltr">${m.host.ip}:${m.host.port}</strong></div>`;
-    }
-    html += `<div class="cart-item"><span>معرّف الجهاز:</span><strong dir="ltr" style="font-size:11px">${devId}</strong></div>`;
-    html += `<button class="btn btn-primary btn-block" onclick="scanForHosts()">🔄 البحث عن أجهزة رئيسية</button>`;
-    html += `<button class="btn btn-info btn-block" onclick="Sync.flush()">📤 مزامنة الآن</button>`;
-    net.innerHTML = html;
+    net.innerHTML = `
+      <div class="cart-item"><span>الوضع:</span><strong>${m.current === 'host' ? '🖥️ مضيف' : (m.current === 'client' ? '📱 عميل' : '—')}</strong></div>
+      ${m.host ? '<div class="cart-item"><span>الخادم:</span><strong dir="ltr">' + m.host.ip + ':' + m.host.port + '</strong></div>' : ''}
+      <div class="cart-item"><span>معرّف الجهاز:</span><strong dir="ltr" style="font-size:11px">${devId}</strong></div>
+      <button class="btn btn-primary btn-block" onclick="scanForHosts()">🔄 البحث عن أجهزة رئيسية</button>
+      <button class="btn btn-info btn-block" onclick="Sync.flush()">📤 مزامنة الآن</button>
+    `;
   }
 }
 
 function saveShopSettings() {
   const s = DB.settings();
-  s.shopName = document.getElementById('setShopName').value.trim();
-  s.shopAddress = document.getElementById('setShopAddress').value.trim();
-  s.shopPhone = document.getElementById('setShopPhone').value.trim();
-  s.shopRC = document.getElementById('setShopRC').value.trim();
+  s.shopName = (document.getElementById('setShopName').value || '').trim();
+  s.shopAddress = (document.getElementById('setShopAddress').value || '').trim();
+  s.shopPhone = (document.getElementById('setShopPhone').value || '').trim();
+  s.shopRC = (document.getElementById('setShopRC').value || '').trim();
   DB.setObj('settings', s);
   if (typeof loadShopName === 'function') loadShopName();
   toast('✅ تم الحفظ');
@@ -45,9 +43,9 @@ function saveShopSettings() {
 
 function saveInvoiceSettings() {
   const s = DB.settings();
-  s.invPrefix = document.getElementById('setInvPrefix').value.trim() || 'INV-';
-  s.purPrefix = document.getElementById('setPurPrefix').value.trim() || 'PUR-';
-  s.currency = document.getElementById('setCurrency').value.trim() || 'دج';
+  s.invPrefix = (document.getElementById('setInvPrefix').value || '').trim() || 'INV-';
+  s.purPrefix = (document.getElementById('setPurPrefix').value || '').trim() || 'PUR-';
+  s.currency = (document.getElementById('setCurrency').value || '').trim() || 'دج';
   s.taxRate = +document.getElementById('setTaxRate').value || 0;
   s.expiryDays = +document.getElementById('setExpiryDays').value || 30;
   DB.setObj('settings', s);
@@ -56,9 +54,9 @@ function saveInvoiceSettings() {
 
 function savePrintSettings() {
   const s = DB.settings();
-  s.paperSize = document.getElementById('setPaperSize').value;
+  s.paperSize = document.getElementById('setPaperSize').value || '58';
   DB.setObj('settings', s);
-  toast('✅ تم الحفظ');
+  toast('✅ تم حفظ حجم الورق: ' + s.paperSize);
 }
 
 function toggleDark() {
