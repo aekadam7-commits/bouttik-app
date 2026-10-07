@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — لوحة المعلومات (مصحّح)
+   Boutik v4 — لوحة المعلومات (مع تنبيه حجم البيانات)
    ============================================================ */
 
 function renderDashboard() {
@@ -79,6 +79,33 @@ function renderDashboard() {
 
   renderNetworkInfo();
   if (typeof renderShiftCard === 'function') renderShiftCard();
+
+  // تنبيه حجم البيانات
+  try {
+    if (typeof getStorageSize === 'function') {
+      const size = getStorageSize();
+      const elWarn = document.getElementById('storageWarning');
+      if (elWarn) {
+        if (size.mb > 7) {
+          elWarn.style.display = 'block';
+          elWarn.innerHTML = `<div class="card" style="background:#ffecec;border-right:4px solid #e74c3c">
+            <h3>⚠️ تنبيه حجم البيانات</h3>
+            <div>حجم البيانات: <b style="color:#c00">${size.mb} MB / 10 MB</b></div>
+            <div class="small" style="margin-top:6px">قم بتصدير نسخة احتياطية وحذف البيانات القديمة.</div>
+            <button class="btn btn-warning btn-block" style="margin-top:8px" onclick="switchTab('settings')">⚙️ إدارة البيانات</button>
+          </div>`;
+        } else if (size.mb > 5) {
+          elWarn.style.display = 'block';
+          elWarn.innerHTML = `<div class="card" style="background:#fff3cd;border-right:4px solid #f39c12">
+            <h3>⚠️ حجم البيانات يقترب من الحد</h3>
+            <div>حجم البيانات: <b>${size.mb} MB / 10 MB</b></div>
+          </div>`;
+        } else {
+          elWarn.style.display = 'none';
+        }
+      }
+    }
+  } catch (e) {}
 }
 
 function renderNetworkInfo() {
@@ -90,7 +117,6 @@ function renderNetworkInfo() {
     return;
   }
   let html = `<div class="cart-item"><span>الوضع:</span><strong>${mode.current === 'host' ? '🖥️ مضيف' : '📱 عميل'}</strong></div>`;
-
   if (mode.current === 'client' && mode.host) {
     html += `<div class="cart-item"><span>الخادم:</span><strong>${escapeHtml(mode.host.name || '')}</strong></div>`;
     html += `<div class="cart-item"><span>العنوان:</span><strong dir="ltr">${mode.host.ip}:${mode.host.port}</strong></div>`;
@@ -99,7 +125,6 @@ function renderNetworkInfo() {
     html += `<div class="cart-item"><span>منفذ السيرفر:</span><strong dir="ltr">8787</strong></div>`;
     html += `<div class="cart-item"><span>حالة السيرفر:</span><strong>🟢 محلي</strong></div>`;
   }
-
   if (typeof Device !== 'undefined' && Device.getId) {
     html += `<div class="cart-item"><span>معرّف الجهاز:</span><strong dir="ltr" style="font-size:11px">${Device.getId()}</strong></div>`;
   }
