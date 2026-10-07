@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — المصادقة
+   Boutik v4 — المصادقة (مصحّح)
    ============================================================ */
 
 let currentUser = null;
@@ -7,64 +7,60 @@ let currentShift = null;
 
 async function doLogin() {
   const errEl = document.getElementById('loginError');
-  if (errEl) errEl.textContent = '';
+  if (errEl) { errEl.textContent = ''; errEl.style.color = '#c62828'; }
   const __sb = document.getElementById('subscriptionBtn');
 
   try {
-    // 1. فحص الترخيص (تخطي في وضع العميل)
     const mode = DB.mode().current;
 
+    // فحص الترخيص فقط في وضع المضيف
     if (mode === 'host') {
-      let licenseOK = false;
-      try {
-        licenseOK = await checkLicenseBeforeLogin();
-      } catch (e) {
-        console.error('License check error:', e);
-        licenseOK = false;
+      let licenseOK = true;
+      if (typeof checkLicenseBeforeLogin === 'function') {
+        try { licenseOK = await checkLicenseBeforeLogin(); }
+        catch (e) { console.error('License check:', e); licenseOK = false; }
       }
-
       if (!licenseOK) {
         if (errEl) {
           errEl.textContent = '⚠️ يجب تفعيل الترخيص أولًا';
           errEl.style.color = '#f39c12';
         }
-        // أظهر شاشة الترخيص
         if (typeof showSubscription === 'function') showSubscription();
         if (__sb) __sb.classList.remove('hidden');
         return;
       }
     }
 
-    // 2. قراءة المدخلات
-    const u = document.getElementById('loginUser').value.trim();
-    const p = document.getElementById('loginPass').value.trim();
+    const u = (document.getElementById('loginUser').value || '').trim();
+    const p = (document.getElementById('loginPass').value || '').trim();
 
     if (!u || !p) {
       if (errEl) errEl.textContent = '❌ أدخل اسم المستخدم وكلمة السر';
       return;
     }
 
-    // 3. التحقق
-    const found = DB.users().find(x => x.username === u && x.password === p);
-    if (!found) {
-      if (errEl) {
-        errEl.textContent = '❌ بيانات خاطئة — جرّب: user / 1234';
-        errEl.style.color = '#c62828';
-      }
+    const users = DB.users();
+    if (!users.length) {
+      if (errEl) errEl.textContent = '❌ لا يوجد مستخدمون — امسح بيانات التطبيق';
       return;
     }
 
-    // 4. نجاح الدخول
+    const found = users.find(x => x.username === u && x.password === p);
+    if (!found) {
+      if (errEl) errEl.textContent = '❌ بيانات خاطئة — جرّب: user / 1234';
+      return;
+    }
+
     currentUser = found;
     audit('login', 'تسجيل دخول');
     sessionStorage.setItem('boutik_user_id', found.id);
 
-    document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('licenseScreen').classList.add('hidden');
-    document.getElementById('modeScreen').classList.add('hidden');
+    ['loginScreen', 'licenseScreen', 'modeScreen'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    });
     document.getElementById('app').classList.add('active');
     document.getElementById('currentUser').textContent = '👤 ' + found.username;
-
     if (__sb) __sb.classList.remove('hidden');
 
     if (typeof applyDarkMode === 'function') applyDarkMode();
@@ -73,7 +69,6 @@ async function doLogin() {
     if (typeof loadActiveShift === 'function') loadActiveShift();
     if (typeof refreshAll === 'function') refreshAll();
     if (typeof Sync !== 'undefined' && Sync.start) Sync.start();
-
   } catch (e) {
     console.error('Login error:', e);
     if (errEl) errEl.textContent = '❌ خطأ: ' + (e.message || e);
@@ -88,7 +83,8 @@ function logout() {
   sessionStorage.removeItem('boutik_user_id');
   document.getElementById('app').classList.remove('active');
   document.getElementById('loginScreen').classList.remove('hidden');
-  document.getElementById('loginError').textContent = '';
+  const el = document.getElementById('loginError');
+  if (el) el.textContent = '';
 }
 
 function loadShopName() {
