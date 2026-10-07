@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — المشتريات
+   Boutik v4 — المشتريات (مع حركة مخزون)
    ============================================================ */
 
 function renderPurchases() {
@@ -56,32 +56,32 @@ function savePurchase() {
   const number = prefix + String(counter).padStart(5, '0');
 
   const purchase = {
-    id: uuid(),
-    number,
+    id: uuid(), number,
     supplier_id: supplierId || null,
     supplier_name: supplier ? supplier.name : '—',
-    total,
-    paid: 0,
-    status: 'credit',
+    total, paid: 0, status: 'credit',
     created_at: now()
   };
   upsertRow('purchases', purchase);
 
-  const item = {
+  upsertRow('purchaseItems', {
     id: uuid(),
     purchase_id: purchase.id,
     product_id: productId,
-    qty,
-    cost,
+    qty, cost,
     subtotal: total
-  };
-  upsertRow('purchaseItems', item);
+  });
 
   if (product) {
-    product.qty = (product.qty || 0) + qty;
-    product.cost = cost; // تحديث سعر الشراء الأخير
+    const before = product.qty || 0;
+    product.qty = before + qty;
+    product.cost = cost;
     upsertRow('products', product);
+    if (typeof recordStockMovement === 'function') {
+      recordStockMovement(product.id, product.name, 'in', qty, before, product.qty, `فاتورة شراء ${number}`);
+    }
   }
+
   if (supplier) {
     supplier.balance = (supplier.balance || 0) + total;
     upsertRow('suppliers', supplier);
@@ -115,4 +115,4 @@ function viewPurchase(id) {
     <div class="cart-total"><span>المجموع:</span><span>${fmt(p.total)}</span></div>
     <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal()">إغلاق</button></div>
   `);
-                        }
+}
