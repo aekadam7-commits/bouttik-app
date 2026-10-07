@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — نقطة البيع (مصحّح)
+   Boutik v4 — نقطة البيع (طباعة عند البيع)
    ============================================================ */
 
 let cart = [];
@@ -23,10 +23,7 @@ function searchPOS() {
     (p.barcode && p.barcode.toLowerCase().includes(q))
   ).slice(0, 20);
 
-  if (!products.length) {
-    res.innerHTML = '<div class="empty">لا نتائج</div>';
-    return;
-  }
+  if (!products.length) { res.innerHTML = '<div class="empty">لا نتائج</div>'; return; }
   res.innerHTML = products.map(p => `
     <div class="cart-item" onclick="addToCart('${p.id}')" style="cursor:pointer">
       <div>
@@ -48,12 +45,8 @@ function addToCart(productId) {
     item.qty++;
   } else {
     cart.push({
-      product_id: p.id,
-      name: p.name,
-      barcode: p.barcode || '',
-      price: p.price,
-      cost: p.cost || 0,
-      qty: 1
+      product_id: p.id, name: p.name, barcode: p.barcode || '',
+      price: p.price, cost: p.cost || 0, qty: 1
     });
   }
   renderCart();
@@ -164,9 +157,7 @@ function finalizeSale() {
   const invoiceNumber = (settings.invPrefix || 'INV-') + String(counter).padStart(5, '0');
 
   const invoice = {
-    id: uuid(),
-    number: invoiceNumber,
-    type: 'sale',
+    id: uuid(), number: invoiceNumber, type: 'sale',
     customer_id: customerId || null,
     customer_name: customerId ? (DB.customers().find(c => c.id === customerId) || {}).name : 'زبون عادي',
     total, paid, due,
@@ -179,31 +170,21 @@ function finalizeSale() {
 
   cart.forEach(it => {
     upsertRow('invoiceItems', {
-      id: uuid(),
-      invoice_id: invoice.id,
-      product_id: it.product_id,
-      name: it.name,
-      price: it.price,
-      cost: it.cost,
-      qty: it.qty,
+      id: uuid(), invoice_id: invoice.id,
+      product_id: it.product_id, name: it.name,
+      price: it.price, cost: it.cost, qty: it.qty,
       subtotal: it.price * it.qty
     });
 
     if (it.product_id) {
       const p = DB.products().find(x => x.id === it.product_id);
-      if (p) {
-        p.qty = Math.max(0, (p.qty || 0) - it.qty);
-        upsertRow('products', p);
-      }
+      if (p) { p.qty = Math.max(0, (p.qty || 0) - it.qty); upsertRow('products', p); }
     }
   });
 
   if (customerId && due > 0) {
     const c = DB.customers().find(x => x.id === customerId);
-    if (c) {
-      c.balance = (c.balance || 0) + due;
-      upsertRow('customers', c);
-    }
+    if (c) { c.balance = (c.balance || 0) + due; upsertRow('customers', c); }
   }
 
   const counters = DB.counters();
@@ -213,16 +194,16 @@ function finalizeSale() {
   audit('sale', invoiceNumber + ' — ' + fmt(total));
   toast('✅ تم البيع: ' + invoiceNumber);
 
+  const invoiceId = invoice.id;
+
   cart = [];
   payType = 'cash';
   setPayType('cash');
   renderCart();
   refreshAll();
 
-  // طباعة بعد التحديث (بتأخير بسيط)
+  // طباعة الفاتورة تلقائيًا بعد البيع
   setTimeout(() => {
-    if (typeof printInvoice === 'function') printInvoice(invoice.id);
+    if (typeof printInvoice === 'function') printInvoice(invoiceId);
   }, 500);
 }
-
-/* ملاحظة: printInvoice معرّفة في invoices.js — لا تُكرّر هنا */
