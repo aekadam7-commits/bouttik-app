@@ -59,6 +59,17 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Add camera permission
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ] && ! grep -q "android.permission.CAMERA" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n    <application|' "$MANIFEST"
+            echo "✅ Camera permission added"
+          else
+            echo "✅ Already present or manifest missing"
+          fi
+          head -20 "$MANIFEST" || true
+
       - name: Fix gradlew permissions
         run: chmod +x android/gradlew
 
