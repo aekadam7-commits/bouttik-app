@@ -1,9 +1,10 @@
 /* ============================================================
-   Boutik v4 — نقطة البيع (حركة مخزون + تحذير المنتهي)
+   Boutik v4 — نقطة البيع (Remote Scanner + حركات مخزون)
    ============================================================ */
 
 let cart = [];
 let payType = 'cash';
+let remoteScanListenerRegistered = false;
 
 function renderPOSCustomers() {
   const sel = document.getElementById('posCustomer');
@@ -12,6 +13,26 @@ function renderPOSCustomers() {
   sel.innerHTML = '<option value="">زبون عادي</option>' +
     DB.customers().map(c => `<option value="${c.id}">${escapeHtml(c.name)} (${fmtNum(c.balance || 0)})</option>`).join('');
   if (cur) sel.value = cur;
+}
+
+function registerRemoteScanListener() {
+  if (remoteScanListenerRegistered) return;
+  if (typeof Sync === 'undefined' || !Sync.onScan) return;
+
+  Sync.onScan((barcode) => {
+    const p = DB.products().find(x => x.barcode === barcode);
+    if (p) {
+      addToCart(p.id);
+      toast('📡 مسح بعيد: ' + p.name);
+      playSuccessBeep();
+      vibrate([60, 30, 60]);
+    } else {
+      toast('📡 مسح بعيد — منتج غير معروف: ' + barcode, true);
+      playErrorBeep();
+    }
+  });
+
+  remoteScanListenerRegistered = true;
 }
 
 function searchPOS() {
