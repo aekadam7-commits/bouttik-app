@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — نقطة البيع (طباعة عند البيع)
+   Boutik v4 — نقطة البيع (حركة مخزون + تحذير المنتهي)
    ============================================================ */
 
 let cart = [];
@@ -24,15 +24,17 @@ function searchPOS() {
   ).slice(0, 20);
 
   if (!products.length) { res.innerHTML = '<div class="empty">لا نتائج</div>'; return; }
-  res.innerHTML = products.map(p => `
-    <div class="cart-item" onclick="addToCart('${p.id}')" style="cursor:pointer">
+  res.innerHTML = products.map(p => {
+    const isExp = typeof isExpired === 'function' && isExpired(p);
+    return `
+    <div class="cart-item" onclick="addToCart('${p.id}')" style="cursor:pointer;${isExp ? 'background:#ffecec;' : ''}">
       <div>
-        <strong>${escapeHtml(p.name)}</strong>
+        <strong>${escapeHtml(p.name)} ${isExp ? '🚨' : ''}</strong>
         <div class="small">${escapeHtml(p.barcode || '')} — ${fmt(p.price)}</div>
       </div>
       <div><b>${p.qty}</b></div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 function addToCart(productId) {
@@ -135,9 +137,23 @@ function totalCart() {
   return cart.reduce((s, it) => s + it.price * it.qty, 0);
 }
 
+function checkExpiredInCart() {
+  const expired = cart.filter(it => {
+    if (!it.product_id) return false;
+    const p = DB.products().find(x => x.id === it.product_id);
+    return p && typeof isExpired === 'function' && isExpired(p);
+  });
+  if (expired.length) {
+    const names = expired.map(e => e.name).join(', ');
+    if (!confirm(`⚠️ تحذير: المنتجات التالية منتهية الصلاحية:\n\n${names}\n\nمتابعة البيع؟`)) return false;
+  }
+  return true;
+}
+
 function finalizeSale() {
   if (!cart.length) { toast('السلة فارغة', true); return; }
   if (!currentShift) { toast('⚠️ يجب فتح وردية أولًا', true); return; }
+  if (!checkExpiredInCart()) return;
 
   const total = totalCart();
   const customerId = document.getElementById('posCustomer').value;
@@ -178,7 +194,14 @@ function finalizeSale() {
 
     if (it.product_id) {
       const p = DB.products().find(x => x.id === it.product_id);
-      if (p) { p.qty = Math.max(0, (p.qty || 0) - it.qty); upsertRow('products', p); }
+      if (p) {
+        const before = p.qty || 0;
+        p.qty = Math.max(0, before - it.qty);
+        upsertRow('products', p);
+        if (typeof recordStockMovement === 'function') {
+          recordStockMovement(p.id, p.name, 'out', it.qty, before, p.qty, `بيع ${invoiceNumber}`);
+        }
+      }
     }
   });
 
@@ -195,14 +218,12 @@ function finalizeSale() {
   toast('✅ تم البيع: ' + invoiceNumber);
 
   const invoiceId = invoice.id;
-
   cart = [];
   payType = 'cash';
   setPayType('cash');
   renderCart();
   refreshAll();
 
-  // طباعة الفاتورة تلقائيًا بعد البيع
   setTimeout(() => {
     if (typeof printInvoice === 'function') printInvoice(invoiceId);
   }, 500);
