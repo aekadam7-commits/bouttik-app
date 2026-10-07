@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — نقطة البيع
+   Boutik v4 — نقطة البيع (مصحّح)
    ============================================================ */
 
 let cart = [];
@@ -169,9 +169,7 @@ function finalizeSale() {
     type: 'sale',
     customer_id: customerId || null,
     customer_name: customerId ? (DB.customers().find(c => c.id === customerId) || {}).name : 'زبون عادي',
-    total,
-    paid,
-    due,
+    total, paid, due,
     status: due === 0 ? 'paid' : (paid === 0 ? 'credit' : 'partial'),
     user: currentUser.username,
     shift_id: currentShift.id,
@@ -180,7 +178,7 @@ function finalizeSale() {
   upsertRow('invoices', invoice);
 
   cart.forEach(it => {
-    const item = {
+    upsertRow('invoiceItems', {
       id: uuid(),
       invoice_id: invoice.id,
       product_id: it.product_id,
@@ -189,8 +187,7 @@ function finalizeSale() {
       cost: it.cost,
       qty: it.qty,
       subtotal: it.price * it.qty
-    };
-    upsertRow('invoiceItems', item);
+    });
 
     if (it.product_id) {
       const p = DB.products().find(x => x.id === it.product_id);
@@ -201,7 +198,6 @@ function finalizeSale() {
     }
   });
 
-  // تحديث رصيد الزبون
   if (customerId && due > 0) {
     const c = DB.customers().find(x => x.id === customerId);
     if (c) {
@@ -210,47 +206,23 @@ function finalizeSale() {
     }
   }
 
-  // تحديث العدّاد
   const counters = DB.counters();
   counters.invoice = counter;
   DB.setObj('counters', counters);
 
   audit('sale', invoiceNumber + ' — ' + fmt(total));
   toast('✅ تم البيع: ' + invoiceNumber);
+
   cart = [];
   payType = 'cash';
   setPayType('cash');
   renderCart();
-  printInvoice(invoice.id);
   refreshAll();
+
+  // طباعة بعد التحديث (بتأخير بسيط)
+  setTimeout(() => {
+    if (typeof printInvoice === 'function') printInvoice(invoice.id);
+  }, 500);
 }
 
-function printInvoice(invoiceId) {
-  const inv = DB.invoices().find(i => i.id === invoiceId);
-  if (!inv) return;
-  const items = DB.invoiceItems().filter(i => i.invoice_id === invoiceId);
-  const s = DB.settings();
-  printHTML(`
-    <div class="center">
-      <h2>${escapeHtml(s.shopName || 'Boutik')}</h2>
-      <div class="small">${escapeHtml(s.shopAddress || '')}</div>
-      <div class="small">${escapeHtml(s.shopPhone || '')}</div>
-    </div>
-    <div class="dashed">
-      <div class="row"><span>الفاتورة:</span><span>${inv.number}</span></div>
-      <div class="row"><span>التاريخ:</span><span>${fmtDate(inv.created_at)}</span></div>
-      <div class="row"><span>الزبون:</span><span>${escapeHtml(inv.customer_name || '')}</span></div>
-      <div class="row"><span>البائع:</span><span>${inv.user}</span></div>
-    </div>
-    <table>
-      <thead><tr><th>المادة</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr></thead>
-      <tbody>${items.map(it => `<tr><td>${escapeHtml(it.name)}</td><td>${it.qty}</td><td>${fmt(it.price)}</td><td>${fmt(it.subtotal)}</td></tr>`).join('')}</tbody>
-    </table>
-    <div class="dashed">
-      <div class="total-row"><span>المجموع:</span><span>${fmt(inv.total)}</span></div>
-      <div class="total-row"><span>المدفوع:</span><span>${fmt(inv.paid)}</span></div>
-      ${inv.due > 0 ? '<div class="total-row" style="color:#c22"><span>الباقي:</span><span>' + fmt(inv.due) + '</span></div>' : ''}
-    </div>
-    <div class="center small">شكرًا لزيارتكم</div>
-  `, 'فاتورة ' + inv.number);
-      }
+/* ملاحظة: printInvoice معرّفة في invoices.js — لا تُكرّر هنا */
