@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — الزبائن والموردين
+   Boutik v4 — الزبائن والموردين (نظام الدفعات)
    ============================================================ */
 
 /* ============ زبائن ============ */
@@ -15,8 +15,9 @@ function renderCustomers() {
       <td dir="ltr">${escapeHtml(c.phone || '—')}</td>
       <td style="color:${(c.balance || 0) > 0 ? '#e74c3c' : '#138a45'};font-weight:700">${fmt(c.balance || 0)}</td>
       <td>
-        <button class="btn btn-info btn-sm" onclick="openCustomerModal('${c.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteCustomer('${c.id}')">🗑️</button>
+        ${(c.balance || 0) > 0 ? `<button class="btn btn-success btn-sm" onclick="openPayCustomerModal('${c.id}')" title="تسجيل دفعة">💰</button>` : ''}
+        <button class="btn btn-info btn-sm" onclick="openCustomerModal('${c.id}')" title="تعديل">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCustomer('${c.id}')" title="حذف">🗑️</button>
       </td>
     </tr>`).join('') : '<tr><td colspan="4" class="empty">لا زبائن</td></tr>';
 }
@@ -56,6 +57,75 @@ function deleteCustomer(id) {
   renderCustomers();
 }
 
+/* ============ دفعة زبون ============ */
+function openPayCustomerModal(id) {
+  const c = DB.customers().find(x => x.id === id);
+  if (!c) return;
+  const balance = c.balance || 0;
+  const unpaidInvoices = DB.invoices().filter(i => i.customer_id === id && i.type === 'sale' && i.due > 0);
+
+  openModal(`
+    <h3>💰 تسجيل دفعة — ${escapeHtml(c.name)}</h3>
+    <div style="background:var(--bg);padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px">
+      <div style="display:flex;justify-content:space-between"><span>الرصيد الحالي (دين):</span><b style="color:#e74c3c">${fmt(balance)}</b></div>
+      <div style="display:flex;justify-content:space-between"><span>عدد الفواتير المعلقة:</span><b>${unpaidInvoices.length}</b></div>
+    </div>
+    <label class="lbl">المبلغ المدفوع</label>
+    <input id="payCustAmt" type="number" inputmode="decimal" value="${balance}" min="0" max="${balance}">
+    <label class="lbl">ملاحظة (اختياري)</label>
+    <input id="payCustNote" placeholder="مثال: دفعة نقدية">
+    <div class="modal-actions">
+      <button class="btn btn-success" onclick="confirmPayCustomer('${id}')">💾 حفظ</button>
+      <button class="btn btn-danger" onclick="closeModal()">إلغاء</button>
+    </div>`);
+}
+
+function confirmPayCustomer(id) {
+  const c = DB.customers().find(x => x.id === id);
+  if (!c) return;
+  let amt = +document.getElementById('payCustAmt').value || 0;
+  const note = (document.getElementById('payCustNote').value || '').trim();
+  const balance = c.balance || 0;
+
+  if (amt <= 0) { toast('أدخل مبلغًا صحيحًا', true); return; }
+  if (amt > balance) amt = balance;
+
+  let remaining = amt;
+
+  const unpaidInvoices = DB.invoices()
+    .filter(i => i.customer_id === id && i.type === 'sale' && i.due > 0)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  unpaidInvoices.forEach(inv => {
+    if (remaining <= 0) return;
+    const pay = Math.min(remaining, inv.due);
+    inv.paid = (inv.paid || 0) + pay;
+    inv.due = Math.max(0, inv.due - pay);
+    inv.status = inv.due === 0 ? 'paid' : (inv.paid > 0 ? 'partial' : 'credit');
+    upsertRow('invoices', inv);
+
+    upsertRow('payments', {
+      id: uuid(),
+      invoice_id: inv.id,
+      customer_id: id,
+      amount: pay,
+      note: note,
+      user: currentUser.username,
+      created_at: now()
+    });
+
+    remaining -= pay;
+  });
+
+  c.balance = Math.max(0, balance - amt);
+  upsertRow('customers', c);
+
+  audit('customer_payment', `${c.name} — ${fmt(amt)}`);
+  toast(`✅ تم تسجيل ${fmt(amt)} — الرصيد الجديد: ${fmt(c.balance)}`);
+  closeModal();
+  renderCustomers();
+}
+
 function printCustomersList() {
   const list = DB.customers();
   printHTML(`
@@ -76,8 +146,9 @@ function renderSuppliers() {
       <td dir="ltr">${escapeHtml(s.phone || '—')}</td>
       <td style="color:${(s.balance || 0) > 0 ? '#e74c3c' : '#138a45'};font-weight:700">${fmt(s.balance || 0)}</td>
       <td>
-        <button class="btn btn-info btn-sm" onclick="openSupplierModal('${s.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteSupplier('${s.id}')">🗑️</button>
+        ${(s.balance || 0) > 0 ? `<button class="btn btn-success btn-sm" onclick="openPaySupplierModal('${s.id}')" title="تسجيل دفعة">💰</button>` : ''}
+        <button class="btn btn-info btn-sm" onclick="openSupplierModal('${s.id}')" title="تعديل">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSupplier('${s.id}')" title="حذف">🗑️</button>
       </td>
     </tr>`).join('') : '<tr><td colspan="4" class="empty">لا موردين</td></tr>';
 }
@@ -113,6 +184,46 @@ function saveSupplier(id) {
 function deleteSupplier(id) {
   if (!confirm('حذف المورد؟')) return;
   removeRow('suppliers', id);
+  renderSuppliers();
+}
+
+/* ============ دفعة مورد ============ */
+function openPaySupplierModal(id) {
+  const s = DB.suppliers().find(x => x.id === id);
+  if (!s) return;
+  const balance = s.balance || 0;
+
+  openModal(`
+    <h3>💰 تسجيل دفعة للمورد — ${escapeHtml(s.name)}</h3>
+    <div style="background:var(--bg);padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px">
+      <div style="display:flex;justify-content:space-between"><span>الرصيد الحالي (علينا):</span><b style="color:#e74c3c">${fmt(balance)}</b></div>
+    </div>
+    <label class="lbl">المبلغ المدفوع</label>
+    <input id="paySupAmt" type="number" inputmode="decimal" value="${balance}" min="0" max="${balance}">
+    <label class="lbl">ملاحظة (اختياري)</label>
+    <input id="paySupNote" placeholder="مثال: دفع نقدي">
+    <div class="modal-actions">
+      <button class="btn btn-success" onclick="confirmPaySupplier('${id}')">💾 حفظ</button>
+      <button class="btn btn-danger" onclick="closeModal()">إلغاء</button>
+    </div>`);
+}
+
+function confirmPaySupplier(id) {
+  const s = DB.suppliers().find(x => x.id === id);
+  if (!s) return;
+  let amt = +document.getElementById('paySupAmt').value || 0;
+  const note = (document.getElementById('paySupNote').value || '').trim();
+  const balance = s.balance || 0;
+
+  if (amt <= 0) { toast('أدخل مبلغًا صحيحًا', true); return; }
+  if (amt > balance) amt = balance;
+
+  s.balance = Math.max(0, balance - amt);
+  upsertRow('suppliers', s);
+
+  audit('supplier_payment', `${s.name} — ${fmt(amt)}`);
+  toast(`✅ تم تسجيل ${fmt(amt)} — الرصيد الجديد: ${fmt(s.balance)}`);
+  closeModal();
   renderSuppliers();
 }
 
