@@ -1,14 +1,13 @@
 /* ============================================================
-   Boutik v4 — قارئ الباركود (محسّن + صوت قوي + منع التكرار)
+   Boutik v4 — قارئ الباركود + وضع Remote Scanner
    ============================================================ */
 
 let scannerInstance = null;
 let scannerTarget = null;
 let scannerLastCode = '';
 let scannerLastTime = 0;
-let scannerBeepEnabled = true;
+let remoteScannerMode = false;
 
-/* جلب إعدادات الماسح */
 function getScannerConfig() {
   try {
     const s = DB.settings();
@@ -56,16 +55,14 @@ function openScanner(target) {
         },
         aspectRatio: 1.0,
         disableFlip: false,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true
-        }
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
       },
       (decodedText, decodedResult) => {
         onScanSuccess(decodedText, decodedResult);
       },
       () => {}
     ).then(() => {
-      if (st) st.textContent = '✅ وجّه الكاميرا نحو الباركود...';
+      if (st) st.textContent = remoteScannerMode ? '📡 وضع المسح عن بُعد — وجّه الكاميرا...' : '✅ وجّه الكاميرا نحو الباركود...';
       vibrate([30, 60, 30]);
     }).catch(err => {
       if (st) st.textContent = '❌ ' + err;
@@ -82,7 +79,6 @@ function onScanSuccess(text, result) {
   const cfg = getScannerConfig();
   const now = Date.now();
 
-  // منع التكرار خلال فترة قصيرة
   if (cfg.avoidDuplicate && text === scannerLastCode && (now - scannerLastTime) < cfg.duplicateInterval) {
     return;
   }
@@ -90,15 +86,12 @@ function onScanSuccess(text, result) {
   scannerLastCode = text;
   scannerLastTime = now;
 
-  // صوت + اهتزاز
   if (cfg.beep) playSuccessBeep();
   if (cfg.vibrate) vibrate([80, 40, 80]);
 
-  // عرض آخر مسح
   const last = document.getElementById('scannerLast');
   if (last) last.textContent = '✅ ' + text;
 
-  // معالجة المسح
   handleScan(text);
 }
 
@@ -115,6 +108,17 @@ function closeScanner() {
 }
 
 function handleScan(text) {
+  if (remoteScannerMode) {
+    const sent = (typeof Sync !== 'undefined' && Sync.sendScan) ? Sync.sendScan(text) : false;
+    if (sent) {
+      toast('📡 تم إرسال: ' + text);
+    } else {
+      toast('⚠️ لا يوجد اتصال بالسيرفر', true);
+      playErrorBeep();
+    }
+    return;
+  }
+
   if (scannerTarget === 'pos') {
     const p = DB.products().find(x => x.barcode === text);
     if (p) {
@@ -125,42 +129,49 @@ function handleScan(text) {
       toast('⚠️ منتج غير معروف: ' + text, true);
     }
   } else if (scannerTarget === 'product') {
-    // فتح/تحديث نموذج المنتج
     const p = DB.products().find(x => x.barcode === text);
     if (p) {
       closeScanner();
-      // فتح نموذج التعديل
       if (typeof openProductModal === 'function') {
         openProductModal(p.id);
         toast('📦 منتج موجود: ' + p.name);
       }
     } else {
       closeScanner();
-      // فتح نموذج جديد مع الباركود معبّأ
       if (typeof openProductModalWithBarcode === 'function') {
         openProductModalWithBarcode(text);
-      } else if (typeof openProductModal === 'function') {
-        openProductModal();
-        setTimeout(() => {
-          const f = document.getElementById('pBarcode');
-          if (f) f.value = text;
-        }, 50);
-        toast('➕ منتج جديد: ' + text);
       }
     }
   } else if (scannerTarget === 'product-barcode') {
-    // فقط معبّئ حقل الباركود
     const f = document.getElementById('pBarcode');
     if (f) {
       f.value = text;
-      // البحث التلقائي عن منتج بنفس الباركود
       if (typeof onProductBarcodeChange === 'function') onProductBarcodeChange(text);
     }
     closeScanner();
   }
 }
 
-/* إعدادات الماسح — للاستخدام في settings.js */
+function startRemoteScanner() {
+  if (DB.mode().current !== 'client') {
+    toast('⚠️ يجب أن تكون جهازًا فرعيًا (عميل)', true);
+    return;
+  }
+  if (!Net.host) {
+    toast('⚠️ غير متصل بمضيف', true);
+    return;
+  }
+  remoteScannerMode = true;
+  toast('📡 وضع المسح عن بُعد مُفعَّل — سيُرسَل إلى الحاسوب');
+  openScanner('remote');
+}
+
+function stopRemoteScanner() {
+  remoteScannerMode = false;
+  closeScanner();
+  toast('⏹️ تم إيقاف وضع المسح عن بُعد');
+}
+
 function saveScannerSettings() {
   const s = DB.settings();
   s.scannerBeep = document.getElementById('setScannerBeep')?.checked !== false;
