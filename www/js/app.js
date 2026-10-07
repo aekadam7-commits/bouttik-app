@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — النواة الرئيسية
+   Boutik v4 — النواة الرئيسية (مصحّح)
    ============================================================ */
 
 function buildNav() {
@@ -19,7 +19,9 @@ function buildNav() {
   ];
   const role = currentUser ? currentUser.role : 'cashier';
   const allowed = tabs.filter(t => t.roles.includes(role));
-  document.getElementById('mainNav').innerHTML = allowed
+  const nav = document.getElementById('mainNav');
+  if (!nav) return;
+  nav.innerHTML = allowed
     .map((t, i) => `<button class="${i === 0 ? 'active' : ''}" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.label}</button>`)
     .join('');
 }
@@ -33,87 +35,85 @@ function switchTab(tab) {
   if (btn) btn.classList.add('active');
 
   const actions = {
-    dashboard: renderDashboard,
-    products: renderProducts,
-    customers: renderCustomers,
-    suppliers: renderSuppliers,
-    purchases: renderPurchases,
-    invoices: renderInvoices,
-    inventory: renderInventoryTab,
-    reports: renderReports,
-    settings: renderSettings,
-    users: renderUsers,
-    contact: () => {},
-    pos: () => { renderPOSCustomers(); searchPOS(); }
+    dashboard: 'renderDashboard',
+    products: 'renderProducts',
+    customers: 'renderCustomers',
+    suppliers: 'renderSuppliers',
+    purchases: 'renderPurchases',
+    invoices: 'renderInvoices',
+    inventory: 'renderInventoryTab',
+    reports: 'renderReports',
+    settings: 'renderSettings',
+    users: 'renderUsers'
   };
-  if (actions[tab]) actions[tab]();
+  if (tab === 'pos') {
+    if (typeof renderPOSCustomers === 'function') renderPOSCustomers();
+    if (typeof searchPOS === 'function') searchPOS();
+  } else if (actions[tab]) {
+    const fn = window[actions[tab]];
+    if (typeof fn === 'function') { try { fn(); } catch (e) { console.error(e); } }
+  }
 }
 
 function refreshAll() {
-  renderDashboard();
-  if (typeof renderProducts === 'function') renderProducts();
-  if (typeof renderCustomers === 'function') renderCustomers();
-  if (typeof renderSuppliers === 'function') renderSuppliers();
-  if (typeof renderInvoices === 'function') renderInvoices();
-  if (typeof renderPurchases === 'function') renderPurchases();
-  if (typeof renderReports === 'function') renderReports();
-  if (typeof renderPOSCustomers === 'function') renderPOSCustomers();
-  if (typeof renderCart === 'function') renderCart();
-  if (typeof renderSettings === 'function') renderSettings();
-  if (typeof renderUsers === 'function') renderUsers();
+  const safe = (n) => { if (typeof window[n] === 'function') { try { window[n](); } catch (e) { console.warn(n, e); } } };
+  ['renderDashboard','renderProducts','renderCustomers','renderSuppliers',
+   'renderInvoices','renderPurchases','renderReports','renderPOSCustomers',
+   'renderCart','renderSettings','renderUsers'].forEach(safe);
 }
 
 function chooseMode(mode) {
+  if (typeof Net === 'undefined') { alert('Net module missing'); return; }
   if (mode === 'host') {
     Net.setMode('host', null);
     toast('✅ تم اختيار الوضع: مضيف');
-    // المضيف يحتاج سيرفرًا محليًا، لكن في حالة الويب نستخدم localhost فقط
     afterModeChosen();
   } else {
     Net.setMode('client', null);
-    document.getElementById('modeNetwork').classList.remove('hidden');
-    Net.scanForHosts();
+    const mn = document.getElementById('modeNetwork');
+    if (mn) mn.classList.remove('hidden');
+    if (typeof Net.scanForHosts === 'function') Net.scanForHosts();
   }
 }
 
 function afterModeChosen() {
-  const m = DB.mode();
-  document.getElementById('modeScreen').classList.add('hidden');
+  try {
+    const m = DB.mode();
+    const ms = document.getElementById('modeScreen');
+    if (ms) ms.classList.add('hidden');
 
-  if (m.current === 'host') {
-    // المضيف يحتاج ترخيصًا
-    const st = licenseState();
-    if (!st.active) {
-      showSubscription();
+    if (m.current === 'host') {
+      if (typeof licenseState !== 'function') { showLogin(); return; }
+      const st = licenseState();
+      if (!st || !st.active) showSubscription();
+      else showLogin();
     } else {
       showLogin();
     }
-  } else {
-    // العميل: لا يحتاج ترخيصًا (يتحقق من المضيف)
+  } catch (e) {
+    console.error('afterModeChosen:', e);
     showLogin();
   }
 }
 
 function showLogin() {
-  document.getElementById('licenseScreen').classList.add('hidden');
-  document.getElementById('loginScreen').classList.remove('hidden');
+  const lic = document.getElementById('licenseScreen');
+  if (lic) lic.classList.add('hidden');
+  const login = document.getElementById('loginScreen');
+  if (login) login.classList.remove('hidden');
 
   const m = DB.mode();
   const badge = document.getElementById('netBadge');
   if (badge) {
     badge.classList.remove('hidden');
     if (m.current === 'host') { badge.className = 'net-badge host'; badge.textContent = '🖥️ وضع المضيف'; }
-    else { badge.className = 'net-badge client'; badge.textContent = '📱 وضع العميل — ' + (m.host ? m.host.ip + ':' + m.host.port : 'غير متصل'); }
-  }
-  const hint = document.getElementById('hostHint');
-  if (hint && m.current === 'client' && m.host) {
-    hint.textContent = 'http://' + m.host.ip + ':' + m.host.port;
+    else { badge.className = 'net-badge client'; badge.textContent = '📱 وضع العميل' + (m.host ? ' — ' + m.host.ip + ':' + m.host.port : ''); }
   }
 }
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    closeModal();
+    if (typeof closeModal === 'function') closeModal();
     if (typeof closeScanner === 'function') closeScanner();
   }
   if (e.key === 'Enter') {
@@ -122,22 +122,22 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-/* ============================================================
-   التهيئة الأولية
-   ============================================================ */
 window.addEventListener('load', () => {
-  BoutikI18n.init();
-  applyDarkMode();
-  updateNetStatus();
+  try {
+    if (typeof BoutikI18n !== 'undefined' && BoutikI18n.init) BoutikI18n.init();
+    if (typeof applyDarkMode === 'function') applyDarkMode();
+    if (typeof updateNetStatus === 'function') updateNetStatus();
 
-  const mode = DB.mode().current;
-  if (!mode) {
-    // اترك شاشة اختيار الوضع
-  } else {
-    document.getElementById('modeScreen').classList.add('hidden');
-    Net.current();
-    afterModeChosen();
-    tryAutoLogin();
+    const mode = DB.mode().current;
+    if (mode) {
+      const ms = document.getElementById('modeScreen');
+      if (ms) ms.classList.add('hidden');
+      if (typeof Net !== 'undefined' && Net.current) Net.current();
+      afterModeChosen();
+      if (typeof tryAutoLogin === 'function') tryAutoLogin();
+    }
+  } catch (e) {
+    console.error('load error:', e);
   }
   console.log('🚀 Boutik v4 جاهز');
 });
