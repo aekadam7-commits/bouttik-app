@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — لوحة المعلومات
+   Boutik v4 — لوحة المعلومات (مصحّح)
    ============================================================ */
 
 function renderDashboard() {
@@ -51,6 +51,7 @@ function renderDashboard() {
     }
   }
 
+  // انتهاء الصلاحية
   const expiring = products.filter(isExpiringSoon);
   const expired = products.filter(isExpired);
   const expList = el('expiryList');
@@ -77,7 +78,7 @@ function renderDashboard() {
   }
 
   renderNetworkInfo();
-  renderShiftCard();
+  if (typeof renderShiftCard === 'function') renderShiftCard();
 }
 
 function renderNetworkInfo() {
@@ -89,13 +90,18 @@ function renderNetworkInfo() {
     return;
   }
   let html = `<div class="cart-item"><span>الوضع:</span><strong>${mode.current === 'host' ? '🖥️ مضيف' : '📱 عميل'}</strong></div>`;
-  if (mode.host) {
-    html += `<div class="cart-item"><span>الخادم:</span><strong>${mode.host.name}</strong></div>`;
+
+  if (mode.current === 'client' && mode.host) {
+    html += `<div class="cart-item"><span>الخادم:</span><strong>${escapeHtml(mode.host.name || '')}</strong></div>`;
     html += `<div class="cart-item"><span>العنوان:</span><strong dir="ltr">${mode.host.ip}:${mode.host.port}</strong></div>`;
+    html += `<div class="cart-item"><span>الحالة:</span><strong>${Net.online ? '✅ متصل' : '❌ غير متصل'}</strong></div>`;
+  } else if (mode.current === 'host') {
+    html += `<div class="cart-item"><span>منفذ السيرفر:</span><strong dir="ltr">8787</strong></div>`;
+    html += `<div class="cart-item"><span>حالة السيرفر:</span><strong>🟢 محلي</strong></div>`;
   }
-  if (mode.current === 'host') {
-    html += `<div class="cart-item"><span>عنوان هذا الجهاز:</span><strong dir="ltr">${Net.baseUrl() || 'localhost:8787'}</strong></div>`;
+
+  if (typeof Device !== 'undefined' && Device.getId) {
+    html += `<div class="cart-item"><span>معرّف الجهاز:</span><strong dir="ltr" style="font-size:11px">${Device.getId()}</strong></div>`;
   }
-  html += `<div class="cart-item"><span>معرّف الجهاز:</span><strong dir="ltr" style="font-size:11px">${Device.getId()}</strong></div>`;
   el.innerHTML = html;
 }
