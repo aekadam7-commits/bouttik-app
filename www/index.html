@@ -469,5 +469,28 @@
 <!-- App -->
 <script src="js/app.js"></script>
 
+<!-- 🔍 Console تشخيصي — سيُحذف لاحقًا -->
+<script>
+window.addEventListener('load', function() {
+  setTimeout(function() {
+    var info = document.createElement('div');
+    info.id = '__debug_console__';
+    info.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;padding:8px;font-size:11px;font-family:monospace;z-index:99999;direction:ltr;line-height:1.5;border-top:2px solid #0f0;max-height:40vh;overflow:auto';
+    var dm = document.getElementById('dataManagement');
+    var lines = [];
+    lines.push('=== DEBUG ===');
+    lines.push('renderDataManagement: ' + typeof renderDataManagement);
+    lines.push('renderSettings: ' + typeof renderSettings);
+    lines.push('dataManagement el: ' + (dm ? 'YES' : 'NO'));
+    lines.push('dm.innerHTML.length: ' + (dm ? dm.innerHTML.length : 'N/A'));
+    if (dm) {
+      lines.push('dm.first 100 chars: ' + dm.innerHTML.substring(0, 100).replace(/</g, '&lt;'));
+    }
+    info.innerHTML = lines.join('<br>');
+    document.body.appendChild(info);
+  }, 5000);
+});
+</script>
+
 </body>
-  </html>
+</html>
