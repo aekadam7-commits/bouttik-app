@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — أدوات مساعدة (طباعة متوافقة مع APK + صوت)
+   Boutik v4 — أدوات مساعدة (طباعة + صوت + اهتزاز)
    ============================================================ */
 
 function now() { return new Date().toISOString(); }
@@ -72,9 +72,6 @@ function exportCSV(filename, headers, rows) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-/* ============================================================
-   صوت المسح — Beep قوي + اهتزاز
-   ============================================================ */
 function playBeep(frequency = 900, duration = 180) {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -110,9 +107,6 @@ function vibrate(pattern) {
   } catch (e) {}
 }
 
-/* ============================================================
-   الطباعة
-   ============================================================ */
 function printHTML(content, title) {
   let size = '58';
   try { size = DB.settings().paperSize || '58'; } catch {}
@@ -219,4 +213,4 @@ function uuid() {
 
 function getQueryParam(name) {
   return new URLSearchParams(location.search).get(name);
-  }
+     }
