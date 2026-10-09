@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — النواة الرئيسية (مصحّح)
+   Boutik v4 — النواة الرئيسية
    ============================================================ */
 
 function buildNav() {
@@ -12,6 +12,8 @@ function buildNav() {
     { id: 'purchases', label: '🛒 المشتريات', roles: ['admin','manager','stock'] },
     { id: 'invoices', label: '🧾 فواتير البيع', roles: ['admin','manager','cashier'] },
     { id: 'inventory', label: '📋 الجرد', roles: ['admin','manager','stock'] },
+    { id: 'expenses', label: '💰 المصاريف', roles: ['admin','manager'] },
+    { id: 'reservations', label: '📦 الحجوزات', roles: ['admin','manager','cashier'] },
     { id: 'reports', label: '📈 التقارير', roles: ['admin','manager'] },
     { id: 'settings', label: '⚙️ الإعدادات', roles: ['admin'] },
     { id: 'users', label: '👤 المستخدمون', roles: ['admin'] },
@@ -42,6 +44,8 @@ function switchTab(tab) {
     purchases: 'renderPurchases',
     invoices: 'renderInvoices',
     inventory: 'renderInventoryTab',
+    expenses: 'renderExpenses',
+    reservations: 'renderReservations',
     reports: 'renderReports',
     settings: 'renderSettings',
     users: 'renderUsers'
@@ -49,9 +53,16 @@ function switchTab(tab) {
   if (tab === 'pos') {
     if (typeof renderPOSCustomers === 'function') renderPOSCustomers();
     if (typeof searchPOS === 'function') searchPOS();
+    if (typeof renderCart === 'function') renderCart();
+    // إظهار/إخفاء شريط Remote Scanner
+    const bar = document.getElementById('remoteScannerBar');
+    if (bar) {
+      bar.style.display = (DB.mode().current === 'client' && Net.host) ? 'block' : 'none';
+    }
+    if (typeof registerRemoteScanListener === 'function') registerRemoteScanListener();
   } else if (actions[tab]) {
     const fn = window[actions[tab]];
-    if (typeof fn === 'function') { try { fn(); } catch (e) { console.error(e); } }
+    if (typeof fn === 'function') { try { fn(); } catch (e) { console.error(tab + ':', e); } }
   }
 }
 
@@ -59,7 +70,8 @@ function refreshAll() {
   const safe = (n) => { if (typeof window[n] === 'function') { try { window[n](); } catch (e) { console.warn(n, e); } } };
   ['renderDashboard','renderProducts','renderCustomers','renderSuppliers',
    'renderInvoices','renderPurchases','renderReports','renderPOSCustomers',
-   'renderCart','renderSettings','renderUsers'].forEach(safe);
+   'renderCart','renderSettings','renderUsers','renderExpenses',
+   'renderReservations'].forEach(safe);
 }
 
 function chooseMode(mode) {
