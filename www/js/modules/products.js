@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — المنتجات (بحث تلقائي + إضافة كمية + سجل حركات)
+   Boutik v4 — المنتجات (إضافة كمية + سجل حركات + بحث تلقائي)
    ============================================================ */
 
 function renderProducts() {
@@ -46,7 +46,6 @@ function renderProducts() {
   }
 }
 
-/* ============ إضافة كمية سريعة ============ */
 function openAddQtyModal(id) {
   const p = DB.products().find(x => x.id === id);
   if (!p) return;
@@ -90,7 +89,6 @@ function confirmAddQty(id) {
   renderProducts();
 }
 
-/* ============ سجل حركات المخزون ============ */
 function recordStockMovement(productId, productName, type, qty, before, after, reason) {
   try {
     const movements = DB.get('stockMovements');
@@ -137,7 +135,6 @@ function openStockHistory(id) {
   `);
 }
 
-/* ============ بحث تلقائي عند مسح/كتابة الباركود ============ */
 function onProductBarcodeChange(barcode) {
   barcode = (barcode || '').trim();
   if (!barcode) return;
@@ -146,7 +143,6 @@ function onProductBarcodeChange(barcode) {
   if (!infoEl) return;
 
   if (existing) {
-    // منتج موجود
     infoEl.innerHTML = `<div style="background:#fff3cd;color:#856404;padding:10px;border-radius:8px;margin:8px 0;font-size:13px">
       ⚠️ يوجد منتج بنفس الباركود: <b>${escapeHtml(existing.name)}</b> (الكمية: ${existing.qty})
       <div style="margin-top:8px">
@@ -155,26 +151,15 @@ function onProductBarcodeChange(barcode) {
       </div>
     </div>`;
   } else {
-    // منتج جديد
     infoEl.innerHTML = `<div style="background:#d4edda;color:#155724;padding:10px;border-radius:8px;margin:8px 0;font-size:13px">
       ✅ باركود جديد — أدخل بيانات المنتج
     </div>`;
   }
 }
 
-function loadExistingProduct(id) {
-  const p = DB.products().find(x => x.id === id);
-  if (!p) return;
-  closeModal();
-  openProductModal(id);
-}
+function loadExistingProduct(id) { closeModal(); openProductModal(id); }
+function addQtyToExisting(id) { closeModal(); openAddQtyModal(id); }
 
-function addQtyToExisting(id) {
-  closeModal();
-  openAddQtyModal(id);
-}
-
-/* ============ إضافة/تعديل منتج ============ */
 function openProductModal(id) {
   const p = id ? DB.products().find(x => x.id === id) : {
     name: '', barcode: '', category: '', qty: 0, min_qty: 5, price: 0, cost: 0, expiry_date: ''
@@ -210,19 +195,14 @@ function openProductModal(id) {
       <button class="btn btn-danger" onclick="closeModal()">إلغاء</button>
     </div>`);
 
-  // إذا كان هناك باركود مُعبّأ مسبقًا → افحص فورًا
   if (p.barcode) setTimeout(() => onProductBarcodeChange(p.barcode), 100);
 }
 
-/* فتح نموذج منتج جديد مع باركود معبّأ */
 function openProductModalWithBarcode(barcode) {
   openProductModal();
   setTimeout(() => {
     const f = document.getElementById('pBarcode');
-    if (f) {
-      f.value = barcode;
-      onProductBarcodeChange(barcode);
-    }
+    if (f) { f.value = barcode; onProductBarcodeChange(barcode); }
   }, 100);
 }
 
@@ -231,11 +211,10 @@ function saveProduct(id) {
   const name = (document.getElementById('pName').value || '').trim();
   if (!name) { toast('أدخل الاسم', true); return; }
 
-  // منع التكرار
   if (barcode) {
     const duplicate = DB.products().find(p => p.barcode === barcode && p.id !== id);
     if (duplicate) {
-      if (!confirm(`⚠️ الباركود مستعمل للمنتج: ${duplicate.name}\n\nهل تريد المتابعة؟`)) return;
+      if (!confirm(`⚠️ الباركود مستعمل للمنتج: ${duplicate.name}\n\nمتابعة؟`)) return;
     }
   }
 
