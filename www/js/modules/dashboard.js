@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — لوحة المعلومات (مع تنبيه حجم البيانات)
+   Boutik v4 — لوحة المعلومات (مع المصاريف + تنبيه الحجم)
    ============================================================ */
 
 function renderDashboard() {
@@ -13,7 +13,12 @@ function renderDashboard() {
     const inv = DB.invoices().find(i => i.id === it.invoice_id);
     return inv && inv.type === 'sale' && inv.created_at.startsWith(today);
   });
-  const profit = todayItems.reduce((s, it) => s + ((it.price - it.cost) * it.qty), 0);
+  const grossProfit = todayItems.reduce((s, it) => s + ((it.price - it.cost) * it.qty), 0);
+
+  // طرح المصاريف
+  const expenses = DB.get('expenses').filter(e => e.date === today);
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const netProfit = grossProfit - totalExpenses;
 
   const debts = DB.customers().reduce((s, c) => s + (c.balance || 0), 0);
   const stockValue = products.reduce((s, p) => s + (p.qty * (p.price || 0)), 0);
@@ -23,10 +28,9 @@ function renderDashboard() {
   if (el('statTodayInvoices')) el('statTodayInvoices').textContent = invoices.length;
   if (el('statProducts')) el('statProducts').textContent = products.length;
   if (el('statDebts')) el('statDebts').textContent = fmt(debts);
-  if (el('statTodayProfit')) el('statTodayProfit').textContent = fmt(profit);
+  if (el('statTodayProfit')) el('statTodayProfit').textContent = fmt(netProfit);
   if (el('statStockValue')) el('statStockValue').textContent = fmt(stockValue);
 
-  // تنبيهات المخزون
   const low = products.filter(p => p.qty <= (p.min_qty || 5) && p.qty > 0);
   const out = products.filter(p => p.qty <= 0);
   const lowList = el('lowStockList');
@@ -51,7 +55,6 @@ function renderDashboard() {
     }
   }
 
-  // انتهاء الصلاحية
   const expiring = products.filter(isExpiringSoon);
   const expired = products.filter(isExpired);
   const expList = el('expiryList');
