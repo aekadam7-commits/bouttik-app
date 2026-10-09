@@ -11,7 +11,6 @@
 </head>
 <body>
 
-<!-- ==================== 1. اختيار الوضع ==================== -->
 <div id="modeScreen" class="mode-screen">
   <div class="mode-box">
     <div class="mode-logo">🛒</div>
@@ -41,7 +40,6 @@
   </div>
 </div>
 
-<!-- ==================== 2. الترخيص ==================== -->
 <div id="licenseScreen" class="license-screen hidden">
   <div class="license-box">
     <div class="license-logo">🔐</div>
@@ -59,7 +57,6 @@
   </div>
 </div>
 
-<!-- ==================== 3. الدخول ==================== -->
 <div id="loginScreen" class="login-screen hidden">
   <div class="login-box">
     <div class="login-logo">🛒</div>
@@ -76,7 +73,6 @@
   </div>
 </div>
 
-<!-- ==================== 4. التطبيق ==================== -->
 <div id="app" class="app">
   <header>
     <h2>🛒 Boutik <span id="shopNameHeader" class="shop-name"></span></h2>
@@ -99,7 +95,6 @@
   <nav id="mainNav"></nav>
 
   <main>
-    <!-- ===== DASHBOARD ===== -->
     <div id="tab-dashboard" class="tab-content">
       <div id="storageWarning" style="display:none"></div>
       <div class="stats">
@@ -118,7 +113,6 @@
       <div class="card"><h3>📅 منتجات قريبة الانتهاء</h3><div id="expiryList"></div></div>
     </div>
 
-    <!-- ===== POS ===== -->
     <div id="tab-pos" class="tab-content hidden">
       <div class="pos-grid">
         <div class="card">
@@ -129,23 +123,23 @@
           </div>
           <div id="posResults"></div>
           <div id="remoteScannerBar" style="margin:8px 0;display:none">
-            <button class="btn btn-info btn-block" onclick="startRemoteScanner()">
-              📡 إرسال المسح إلى الحاسوب (وضع المسح عن بُعد)
-            </button>
-            <div class="small" style="text-align:center;margin-top:4px;color:#666">
-              امسح بالهاتف → يظهر مباشرة على POS الحاسوب
-            </div>
+            <button class="btn btn-info btn-block" onclick="startRemoteScanner()">📡 إرسال المسح إلى الحاسوب</button>
           </div>
         </div>
         <div class="card">
           <h3>🛒 السلة <span id="cartCount" class="cart-count">0</span></h3>
           <div id="cartItems"></div>
+          <div id="cartSubtotal"></div>
+          <div id="cartDiscount"></div>
           <div class="cart-total"><span>المجموع:</span><span id="cartTotal">0</span></div>
           <label class="lbl">الزبون:</label>
           <select id="posCustomer"><option value="">زبون عادي</option></select>
           <div class="flex-actions" style="margin:8px 0">
             <button class="btn btn-info btn-sm" onclick="addFreeItem()">➕ مادة حرة</button>
             <button class="btn btn-warning btn-sm" onclick="addCashLoan()">💵 سلفة</button>
+            <button class="btn btn-success btn-sm" onclick="openCalculator()">🧮 حاسبة</button>
+            <button class="btn btn-danger btn-sm" onclick="openDiscountModal()">💸 خصم</button>
+            <button class="btn btn-primary btn-sm" onclick="createReservation()">📦 حجز</button>
           </div>
           <div class="payment-options">
             <button class="active" data-pay="cash" onclick="setPayType('cash')">💵 نقدي</button>
@@ -160,7 +154,6 @@
       </div>
     </div>
 
-    <!-- ===== PRODUCTS ===== -->
     <div id="tab-products" class="tab-content hidden">
       <div class="card">
         <div class="flex-head">
@@ -195,7 +188,6 @@
       </div>
     </div>
 
-    <!-- ===== CUSTOMERS ===== -->
     <div id="tab-customers" class="tab-content hidden">
       <div class="card">
         <div class="flex-head">
@@ -207,13 +199,12 @@
         </div>
         <div class="search-bar"><input id="custSearch" placeholder="بحث..." oninput="renderCustomers()"></div>
         <div class="table-wrap">
-          <table><thead><tr><th>اسم</th><th>هاتف</th><th>رصيد</th><th></th></tr></thead>
+          <table><thead><tr><th>اسم</th><th>هاتف</th><th>رصيد</th><th>خصم</th><th></th></tr></thead>
           <tbody id="customersTable"></tbody></table>
         </div>
       </div>
     </div>
 
-    <!-- ===== SUPPLIERS ===== -->
     <div id="tab-suppliers" class="tab-content hidden">
       <div class="card">
         <div class="flex-head">
@@ -230,7 +221,6 @@
       </div>
     </div>
 
-    <!-- ===== PURCHASES ===== -->
     <div id="tab-purchases" class="tab-content hidden">
       <div class="card">
         <div class="flex-head">
@@ -244,7 +234,6 @@
       </div>
     </div>
 
-    <!-- ===== INVOICES ===== -->
     <div id="tab-invoices" class="tab-content hidden">
       <div class="card">
         <div class="flex-head">
@@ -262,7 +251,6 @@
       </div>
     </div>
 
-    <!-- ===== INVENTORY ===== -->
     <div id="tab-inventory" class="tab-content hidden">
       <div class="card">
         <div class="flex-head">
@@ -273,7 +261,24 @@
       </div>
     </div>
 
-    <!-- ===== REPORTS ===== -->
+    <div id="tab-expenses" class="tab-content hidden">
+      <div class="card">
+        <div class="flex-head">
+          <h3>💰 المصاريف</h3>
+        </div>
+        <div id="expensesList"></div>
+      </div>
+    </div>
+
+    <div id="tab-reservations" class="tab-content hidden">
+      <div class="card">
+        <div class="flex-head">
+          <h3>📦 الحجوزات</h3>
+        </div>
+        <div id="reservationsList"></div>
+      </div>
+    </div>
+
     <div id="tab-reports" class="tab-content hidden">
       <div class="card">
         <h3>📈 التقارير</h3>
@@ -288,7 +293,6 @@
           <div class="stat"><div class="label">قيمة المخزون (شراء)</div><div class="value" id="repStockCost">0</div></div>
         </div>
       </div>
-
       <div class="card">
         <h3>📅 فترة</h3>
         <div class="row">
@@ -299,7 +303,6 @@
         <button class="btn btn-info" onclick="printPeriodReport()">🖨️</button>
         <div id="periodReport"></div>
       </div>
-
       <div class="card">
         <h3>🏆 الأكثر مبيعاً</h3>
         <div class="flex-actions" style="margin-bottom:8px">
@@ -307,7 +310,20 @@
         </div>
         <div id="topProducts"></div>
       </div>
-
+      <div class="card">
+        <h3>📉 المنتجات الراكدة</h3>
+        <div class="flex-actions" style="margin-bottom:8px">
+          <button class="btn btn-warning btn-sm" onclick="printStagnantProducts()">🖨️ طباعة</button>
+        </div>
+        <div id="stagnantProducts"></div>
+      </div>
+      <div class="card">
+        <h3>⭐ أفضل الزبائن</h3>
+        <div class="flex-actions" style="margin-bottom:8px">
+          <button class="btn btn-primary btn-sm" onclick="printTopCustomers()">🖨️ طباعة</button>
+        </div>
+        <div id="topCustomers"></div>
+      </div>
       <div class="card">
         <h3>📦 تقارير المخزون</h3>
         <div class="flex-actions" style="flex-wrap:wrap">
@@ -317,7 +333,6 @@
       </div>
     </div>
 
-    <!-- ===== SETTINGS ===== -->
     <div id="tab-settings" class="tab-content hidden">
       <div class="card">
         <h3>🏪 المحل</h3>
@@ -379,7 +394,6 @@
       </div>
     </div>
 
-    <!-- ===== CONTACT ===== -->
     <div id="tab-contact" class="tab-content hidden">
       <div class="card contact-card">
         <div style="font-size:54px">📞</div>
@@ -396,7 +410,6 @@
       </div>
     </div>
 
-    <!-- ===== USERS ===== -->
     <div id="tab-users" class="tab-content hidden">
       <div class="card">
         <div class="flex-head">
@@ -413,10 +426,8 @@
   </main>
 </div>
 
-<!-- MODAL -->
 <div id="modal" class="modal hidden"><div class="modal-content" id="modalContent"></div></div>
 
-<!-- SCANNER -->
 <div id="scannerOverlay" class="scanner-overlay hidden">
   <div class="scanner-head">
     <span id="scannerTitle">📷 مسح الباركود</span>
@@ -430,13 +441,9 @@
   <button class="btn btn-danger scanner-finish" onclick="closeScanner()">إنهاء</button>
 </div>
 
-<!-- TOAST -->
 <div id="toast" class="toast"></div>
 
-<!-- SCRIPTS -->
 <script src="vendor/html5-qrcode.min.js"></script>
-
-<!-- Core — الترتيب مهم! -->
 <script src="js/core/utils.js"></script>
 <script src="js/core/i18n.js"></script>
 <script src="js/core/store.js"></script>
@@ -444,12 +451,8 @@
 <script src="js/core/net.js"></script>
 <script src="js/core/sync.js"></script>
 <script src="js/core/changelog.js"></script>
-
-<!-- License -->
 <script src="js/license/device.js"></script>
 <script src="js/license/license.js"></script>
-
-<!-- Modules — backup قبل settings -->
 <script src="js/modules/auth.js"></script>
 <script src="js/modules/shifts.js"></script>
 <script src="js/modules/dashboard.js"></script>
@@ -461,13 +464,13 @@
 <script src="js/modules/invoices.js"></script>
 <script src="js/modules/reports.js"></script>
 <script src="js/modules/inventory.js"></script>
+<script src="js/modules/expenses.js"></script>
+<script src="js/modules/reservations.js"></script>
 <script src="js/modules/users.js"></script>
 <script src="js/modules/scanner.js"></script>
 <script src="js/modules/backup.js"></script>
 <script src="js/modules/settings.js"></script>
-
-<!-- App -->
 <script src="js/app.js"></script>
 
 </body>
-</html>
+  </html>
