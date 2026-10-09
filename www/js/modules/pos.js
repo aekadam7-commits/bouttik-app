@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — نقطة البيع (Remote Scanner + حركات مخزون)
+   Boutik v4 — نقطة البيع (➕➖ في السلة + Remote Scanner)
    ============================================================ */
 
 let cart = [];
@@ -64,7 +64,7 @@ function addToCart(productId) {
   if (p.qty <= 0) { toast('⚠️ الكمية نفدت', true); return; }
   const item = cart.find(x => x.product_id === productId);
   if (item) {
-    if (item.qty + 1 > p.qty) { toast('⚠️ الكمية غير كافية', true); return; }
+    if (item.qty + 1 > p.qty) { toast('⚠️ الكمية غير كافية (متوفر: ' + p.qty + ')', true); return; }
     item.qty++;
   } else {
     cart.push({
@@ -72,6 +72,55 @@ function addToCart(productId) {
       price: p.price, cost: p.cost || 0, qty: 1
     });
   }
+  renderCart();
+}
+
+/* ============ تعديل الكمية ============ */
+function increaseQty(index) {
+  const item = cart[index];
+  if (!item) return;
+  if (item.product_id) {
+    const p = DB.products().find(x => x.id === item.product_id);
+    if (p && item.qty + 1 > p.qty) {
+      toast('⚠️ الكمية غير كافية (متوفر: ' + p.qty + ')', true);
+      return;
+    }
+  }
+  item.qty++;
+  renderCart();
+}
+
+function decreaseQty(index) {
+  const item = cart[index];
+  if (!item) return;
+  item.qty--;
+  if (item.qty <= 0) {
+    cart.splice(index, 1);
+  }
+  renderCart();
+}
+
+function setQty(index, value) {
+  const item = cart[index];
+  if (!item) return;
+  let qty = parseInt(value) || 0;
+  if (qty <= 0) {
+    cart.splice(index, 1);
+  } else {
+    if (item.product_id) {
+      const p = DB.products().find(x => x.id === item.product_id);
+      if (p && qty > p.qty) {
+        toast('⚠️ الكمية أكبر من المخزون (متوفر: ' + p.qty + ')', true);
+        qty = p.qty;
+      }
+    }
+    item.qty = qty;
+  }
+  renderCart();
+}
+
+function removeFromCart(index) {
+  cart.splice(index, 1);
   renderCart();
 }
 
@@ -123,21 +172,38 @@ function renderCart() {
   const totalEl = document.getElementById('cartTotal');
   if (!el) return;
 
+  if (!cart.length) {
+    el.innerHTML = '<div class="empty">السلة فارغة</div>';
+    if (countEl) countEl.textContent = '0';
+    if (totalEl) totalEl.textContent = fmt(0);
+    return;
+  }
+
   el.innerHTML = cart.map((it, i) => `
-    <div class="cart-item">
-      <div>
-        <strong>${escapeHtml(it.name)}</strong>
-        <div class="small">${fmt(it.price)} × ${it.qty}</div>
+    <div class="cart-item" style="flex-direction:column;align-items:stretch;gap:6px;padding:10px 4px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong style="font-size:14px">${escapeHtml(it.name)}</strong>
+        <button class="btn btn-danger btn-sm" onclick="removeFromCart(${i})" title="حذف" style="padding:4px 8px;font-size:12px">🗑️</button>
       </div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <b>${fmt(it.price * it.qty)}</b>
-        <button class="btn btn-danger btn-sm" onclick="cart.splice(${i},1);renderCart()">✖</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:6px;flex:1">
+          <button class="btn btn-warning btn-sm" onclick="decreaseQty(${i})" style="min-width:34px;padding:6px 10px;font-size:16px;font-weight:700">➖</button>
+          <input type="number" value="${it.qty}" onchange="setQty(${i}, this.value)" oninput="setQty(${i}, this.value)"
+                 style="width:60px;text-align:center;padding:6px;font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--bg-2);color:var(--text)"
+                 inputmode="numeric" min="1">
+          <button class="btn btn-success btn-sm" onclick="increaseQty(${i})" style="min-width:34px;padding:6px 10px;font-size:16px;font-weight:700">➕</button>
+        </div>
+        <div style="text-align:left;font-size:13px">
+          <div class="small">${fmt(it.price)} × ${it.qty}</div>
+          <b style="color:#138a45">${fmt(it.price * it.qty)}</b>
+        </div>
       </div>
     </div>
-  `).join('') || '<div class="empty">السلة فارغة</div>';
+  `).join('');
 
   const total = cart.reduce((s, it) => s + it.price * it.qty, 0);
-  if (countEl) countEl.textContent = cart.length;
+  const count = cart.reduce((s, it) => s + it.qty, 0);
+  if (countEl) countEl.textContent = count;
   if (totalEl) totalEl.textContent = fmt(total);
 }
 
