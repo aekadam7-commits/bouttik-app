@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — قارئ الباركود + وضع Remote Scanner
+   Boutik v4 — قارئ الباركود (إصلاح الشاشة السوداء)
    ============================================================ */
 
 let scannerInstance = null;
@@ -37,20 +37,23 @@ function openScanner(target) {
 
   const container = document.getElementById('scannerContainer');
   if (!container) return;
-  container.innerHTML = '<div id="qrReader"></div>';
+
+  // مسح أي فيديو سابق
+  container.innerHTML = '<div id="qrReader" style="width:100%;height:100%"></div>';
 
   const st = document.getElementById('scannerStatus');
   if (st) st.textContent = '📷 جارٍ تشغيل الكاميرا...';
 
   try {
     scannerInstance = new Html5Qrcode('qrReader', { verbose: false });
+
     scannerInstance.start(
       { facingMode: 'environment' },
       {
-        fps: 30,
+        fps: 15,
         qrbox: function (w, h) {
           const min = Math.min(w, h);
-          const size = Math.max(220, Math.floor(min * 0.75));
+          const size = Math.max(200, Math.floor(min * 0.7));
           return { width: size, height: size };
         },
         aspectRatio: 1.0,
@@ -64,6 +67,11 @@ function openScanner(target) {
     ).then(() => {
       if (st) st.textContent = remoteScannerMode ? '📡 وضع المسح عن بُعد — وجّه الكاميرا...' : '✅ وجّه الكاميرا نحو الباركود...';
       vibrate([30, 60, 30]);
+
+      // ← إصلاح: تأكد من عرض الفيديو
+      setTimeout(() => forceVideoDisplay(), 300);
+      setTimeout(() => forceVideoDisplay(), 1000);
+      setTimeout(() => forceVideoDisplay(), 2000);
     }).catch(err => {
       if (st) st.textContent = '❌ ' + err;
       playErrorBeep();
@@ -72,6 +80,27 @@ function openScanner(target) {
     console.error('Scanner init:', e);
     if (st) st.textContent = '❌ ' + e.message;
   }
+}
+
+function forceVideoDisplay() {
+  try {
+    const videos = document.querySelectorAll('#scannerContainer video');
+    videos.forEach(video => {
+      video.style.cssText = 'width:100%!important;height:100%!important;object-fit:cover!important;position:absolute!important;top:0!important;left:0!important;display:block!important;visibility:visible!important;opacity:1!important;z-index:1!important';
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('autoplay', 'true');
+      video.setAttribute('muted', 'true');
+      video.muted = true;
+      video.playsInline = true;
+      if (video.paused) {
+        video.play().catch(e => console.warn('video play:', e));
+      }
+    });
+    const qrBox = document.querySelector('#scannerContainer canvas');
+    if (qrBox) {
+      qrBox.style.display = 'none';
+    }
+  } catch (e) { console.warn('forceVideoDisplay:', e); }
 }
 
 function onScanSuccess(text, result) {
