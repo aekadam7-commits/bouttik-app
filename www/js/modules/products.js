@@ -280,4 +280,4 @@ function printBarcodeLabels() {
         </div>`).join('')}
     </div>
   `, 'ملصقات الباركود');
-}
+                                                                                                                                              }
