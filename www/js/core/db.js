@@ -1,5 +1,5 @@
 /* ============================================================
-   Boutik v4 — قاعدة البيانات (مصحّح)
+   Boutik v4 — قاعدة البيانات
    ============================================================ */
 
 const DB = {
@@ -11,7 +11,6 @@ const DB = {
   },
   set(k, v) {
     localStorage.setItem(this.PREFIX + k, JSON.stringify(v));
-    // حماية: لا نسجّل في ChangeLog للجداول الداخلية
     if (typeof ChangeLog !== 'undefined' && ChangeLog && ChangeLog.record) {
       if (['changelog', 'auditLog', 'settings', 'counters', 'mode', 'i18n'].indexOf(k) === -1) {
         try { ChangeLog.record(k, v); } catch (e) { console.warn('ChangeLog error:', e); }
@@ -48,9 +47,6 @@ const DB = {
   mode()     { return this.getObj('mode'); }
 };
 
-/* ============================================================
-   تهيئة قاعدة البيانات — لا تعتمد على uuid() أو now()
-   ============================================================ */
 function __safeUuid() {
   try {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -71,10 +67,10 @@ function initDB() {
       initialized: true, version: 4,
       shopName: 'محل Boutik', shopAddress: '', shopPhone: '', shopRC: '',
       invPrefix: 'INV-', purPrefix: 'PUR-', currency: 'دج',
-      taxRate: 0, expiryDays: 30, paperSize: '58', darkMode: false
+      taxRate: 0, expiryDays: 30, paperSize: '58', darkMode: false,
+      scannerBeep: true, scannerVibrate: true, scannerAvoidDuplicate: true
     });
 
-    // كتابة مباشرة (بدون المرور على DB.set) لتفادي ChangeLog
     const defaultUser = {
       id: 'default-admin-0001',
       username: 'user',
@@ -87,12 +83,13 @@ function initDB() {
 
     ['products','categories','customers','suppliers','invoices','invoiceItems',
      'purchases','purchaseItems','payments','stockMovements','shifts','auditLog',
-     'inventorySessions','inventoryItems','changelog'].forEach(k => {
+     'inventorySessions','inventoryItems','changelog','expenses','reservations','returns'
+    ].forEach(k => {
       localStorage.setItem(DB.PREFIX + k, '[]');
     });
 
     DB.setObj('mode', { current: null, host: null });
-    DB.setObj('counters', { invoice: 0, purchase: 0 });
+    DB.setObj('counters', { invoice: 0, purchase: 0, reservation: 0 });
 
     console.log('✅ Boutik v4: قاعدة البيانات جاهزة');
   } catch (e) {
@@ -100,9 +97,6 @@ function initDB() {
   }
 }
 
-/* ============================================================
-   سجل التدقيق — كتابة مباشرة لتفادي التكرار
-   ============================================================ */
 function audit(action, details = '') {
   try {
     const log = DB.get('auditLog');
