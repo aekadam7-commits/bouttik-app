@@ -68,7 +68,23 @@ jobs:
           else
             echo "✅ Already present or manifest missing"
           fi
-          head -20 "$MANIFEST" || true
+
+      - name: Copy app icons to Android
+        run: |
+          ICON="$GITHUB_WORKSPACE/www/icons/icon-512.png"
+          if [ ! -f "$ICON" ]; then
+            echo "⚠️ icon-512.png missing at www/icons/"
+            exit 0
+          fi
+          cd android/app/src/main/res
+          for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
+            if [ -d "$dir" ]; then
+              cp -f "$ICON" "$dir/ic_launcher.png" 2>/dev/null || true
+              cp -f "$ICON" "$dir/ic_launcher_round.png" 2>/dev/null || true
+              cp -f "$ICON" "$dir/ic_launcher_foreground.png" 2>/dev/null || true
+            fi
+          done
+          echo "✅ Icons copied"
 
       - name: Fix gradlew permissions
         run: chmod +x android/gradlew
@@ -82,3 +98,14 @@ jobs:
           name: boutik-android
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
+
+      - name: Upload APK to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: android/app/build/outputs/apk/debug/*.apk
+          name: Boutik ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
